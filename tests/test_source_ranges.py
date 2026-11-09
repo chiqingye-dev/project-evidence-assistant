@@ -84,3 +84,53 @@ def test_in_range_model_action_is_preserved(tmp_path):
     turn=base.for_task('range-valid',goal=SECTION_GOAL).generate(section_context(),timeout_seconds=5,max_output_tokens=4000)
     assert turn.tool_calls[0].arguments==dict(path='A.java',start_line=2,end_line=3)
     assert ledger.summary('first-trial')['unresolved_requests']==0
+
+@pytest.mark.parametrize('bounds',[
+    [],[[1,2],[2,3]],[[8,9],[1,2]],[[1,121]],[[True,2]],
+    [[1,2],3],[[1,2],[3]],[[1,2],[4,1]],
+    [[2*i+1,2*i+1] for i in range(17)],
+])
+def test_invalid_discrete_spans_do_not_expand_or_expose_configuration(bounds):
+    with pytest.raises(ValueError,match='^Read ranges must contain bounded permitted relative paths$'):
+        normalize_read_ranges({'A.java':bounds})
+
+def test_discrete_spans_mask_gap_preserve_numbers_and_deny_bridging_without_reads():
+    raw=b'first\nsecond\ngap-private\ngap-more\nfifth\nsixth\n'
+    source=FakeSource({'A.java':raw,'Other.java':b'foreign'})
+    tools=RangedSourceTools(source,{'A.java':[(1,2),(5,6)]})
+    assert not tools.search_text('gap')['items']
+    assert tools.search_text('fifth')['items'][0]['line']==5
+    assert tools.read_excerpt('A.java',5,6)['text']=='fifth\nsixth'
+    assert tools.read_excerpt('A.java',1,2)['sha256']==hashlib.sha256(raw).hexdigest()
+    assert tools.read_excerpt('A.java',5,6)['total_lines']==6
+    before=list(source.reads)
+    for start,end in [(2,5),(3,4),(1,6)]:assert tools.read_excerpt('A.java',start,end)['status']=='denied'
+    assert source.reads==before
+
+def test_discrete_scope_total_cap_and_whole_file_sensitive_guard():
+    value={f'A{i}.java':(1,2) for i in range(15)};value['B.java']=[(1,2),(5,6)]
+    with pytest.raises(ValueError):normalize_read_ranges(value)
+    source=FakeSource({'A.java':b'first\npassword="synthetic-sensitive-value"\nlast\n'})
+    result=RangedSourceTools(source,{'A.java':[(1,1),(3,3)]}).read_excerpt('A.java',3,3)
+    assert result['status']=='denied' and 'synthetic-sensitive-value' not in json.dumps(result)
+
+def test_discrete_schema_and_task_clone_copy_nested_configuration(tmp_path):
+    ranges={'A.java':[[1,2],[5,6]]};requests=[]
+    def respond(request):requests.append(json.loads(request.content));return httpx.Response(200,json=envelope())
+    base,ledger=make_adapter(tmp_path,respond,ranges)
+    ranges['A.java'][0][0]=0;ranges['A.java'].append([7,9])
+    task=base.for_task('discrete-copy',goal=SECTION_GOAL)
+    contract=task._contract(section_context())['tool_arguments']['read_excerpt']
+    assert [(x['properties']['start_line']['minimum'],x['properties']['end_line']['maximum']) for x in contract['oneOf']]==[(1,2),(5,6)]
+    assert all(x['properties']['path']['const']=='A.java' and x['additionalProperties'] is False for x in contract['oneOf'])
+    task.generate(section_context(),timeout_seconds=5,max_output_tokens=4000)
+    assert len(requests)==1 and json.dumps(contract,ensure_ascii=False) in requests[0]['messages'][0]['content']
+    assert ledger.summary('first-trial')['unresolved_requests']==0
+
+@pytest.mark.parametrize('start,end',[(3,4),(2,5),(1,6)])
+def test_discrete_model_gap_or_bridge_denied_before_tool_and_usage_settled(tmp_path,start,end):
+    content=json.dumps(dict(kind='tools',tool_calls=[dict(id='bridge',name='read_excerpt',arguments=dict(path='A.java',start_line=start,end_line=end))]))
+    base,ledger=make_adapter(tmp_path,lambda _:httpx.Response(200,json=envelope(content)),{'A.java':[(1,2),(5,6)]})
+    result=run_agent(base.for_task('discrete-denied',goal=SECTION_GOAL),lambda *_:pytest.fail('Gap must not execute'),lambda:None,lambda:False,initial_context=section_context())
+    assert result.status=='failed' and 'tool.read_outside_range' in result.model_dump_json()
+    assert ledger.summary('first-trial')['accounted_upper_bound_microyuan']==28000 and ledger.summary('first-trial')['unresolved_requests']==0

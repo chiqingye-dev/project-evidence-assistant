@@ -8,8 +8,8 @@
   "src/project_evidence/followup_scope_columns.py": "1573100ede88c6167d1610890fbfeffc2736068a5a1a79cd45f21d5cf7ccab7b",
   "src/project_evidence/followup_table_contract.py": "87d2f2c30a42d368ee17e5f65524317255b8cddf3c29a8c1ea6861c0d1b6ab3d",
   "src/project_evidence/followup_prose_kind.py": "64571978697fc1459812f7bbd9635e252e63f2daacfc84735bda7cdda0cf3629",
-  "prompts/learning-guide.txt": "40df65f0bba4b453ef182e75b4f3ef14dd04f33152ec3a7fb1ee586ae0dd781e",
-  "src/project_evidence/__init__.py": "dcf6767b964b4c5198e2de381a05fac941ef71ae45e6192805e72378bf71bb25",
+  "prompts/learning-guide.txt": "f2cb69c7ead3e7d505daa8a923a5f318fad7f481ce01b21b2a4693b3603347a3",
+  "src/project_evidence/__init__.py": "7d9e3f66185a97ef0ef98f54c9d0ad735e13451c1306463afba4e644df9817a6",
   "src/project_evidence/agent_protocol.py": "da30f4795e5404e5930e739c5ca8b1afd7b9bd33102d2b827113d894d71956d7",
-  "src/project_evidence/source_ranges.py": "9cc257e93380ebe98ed6ce89d167ae3471c562eabb89a5ea7c67a2865f8cd9bd"
+  "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b"
 }

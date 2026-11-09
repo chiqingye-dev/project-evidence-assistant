@@ -1,6 +1,6 @@
 [project]
 name = "project-evidence-assistant"
-version = "0.4.4"
+version = "0.4.5"
 description = "A local evidence-backed learning assistant for public Java source projects"
 requires-python = ">=3.12,<3.13"
 dependencies = [
