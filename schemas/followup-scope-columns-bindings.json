@@ -8,7 +8,7 @@
   "src/project_evidence/followup_scope_columns.py": "1573100ede88c6167d1610890fbfeffc2736068a5a1a79cd45f21d5cf7ccab7b",
   "src/project_evidence/followup_table_contract.py": "87d2f2c30a42d368ee17e5f65524317255b8cddf3c29a8c1ea6861c0d1b6ab3d",
   "src/project_evidence/followup_prose_kind.py": "64571978697fc1459812f7bbd9635e252e63f2daacfc84735bda7cdda0cf3629",
-  "prompts/learning-guide.txt": "b41cb256ccdb37b20c924090e6795290dc2076c11ccbcb921a63df2e88811230",
+  "prompts/learning-guide.txt": "1cf6e164cf9c6bfff7de978adce8944a5ee600eb6231b85a40741d74f407bc56",
   "src/project_evidence/__init__.py": "0d2f69380208815a84527556ccd31fadac89624cbf6491abbf6d5f44c365410e",
   "src/project_evidence/agent_protocol.py": "f4b8f34c2cb5d573e78ad11d098e7f06849cf6dbb2f7a36fe7ebd2b9d945f57b"
 }
