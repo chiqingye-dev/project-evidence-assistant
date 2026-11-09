@@ -123,6 +123,29 @@ def _json_property_details(error: json.JSONDecodeError) -> tuple[str, ...]:
     return ("json.key_invalid_token",)
 
 
+def _json_extra_details(error: json.JSONDecodeError) -> tuple[str, ...]:
+    """Classify the first rejected suffix token; never parse or repair it.
+
+    Fixed labels contain no response text, keys, values, positions or sizes.
+    An older extra_data label alone cannot establish this more specific cause.
+    """
+    if error.msg != "Extra data":
+        return ()
+    text, pos = error.doc, error.pos
+    if not isinstance(text, str) or type(pos) is not int or not 0 <= pos < len(text):
+        return ()
+    if text.startswith(chr(96) * 3, pos):
+        return ("json.extra_fence",)
+    token = text[pos]
+    if token == "{":
+        return ("json.extra_object",)
+    if token == "[":
+        return ("json.extra_array",)
+    if token in "}]":
+        return ("json.extra_closer",)
+    return ("json.extra_other",)
+
+
 def _load_guidance(goal=GOAL, topic="query", *, two_phase=False):
     paths = {"query": LEARNING_GUIDANCE_PATHS, "submission": SUBMISSION_GUIDANCE_PATHS,
              "consumption": CONSUMPTION_GUIDANCE_PATHS, "judging": JUDGING_GUIDANCE_PATHS}.get(topic)
@@ -540,7 +563,8 @@ class DeepSeekAdapter:
             raise ModelError("cost_uncertain" if usage is None else "invalid_response", usage=usage,
                              diagnostics=(("envelope.invalid",) if usage is None else
                                           ("action.json_invalid", _json_diagnostic(error),
-                                           *_json_property_details(error)))) from None
+                                           *_json_property_details(error),
+                                           *_json_extra_details(error)))) from None
         except Exception:
             if usage is None:
                 self.ledger.uncertain(reservation)

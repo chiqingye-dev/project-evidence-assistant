@@ -46,7 +46,8 @@ def create_app(data_dir: Path | None = None, *, github_transport: httpx.BaseTran
         yield
         tasks.shutdown()
 
-    app = FastAPI(title="项目学习证据助手", version="0.4.2", lifespan=lifespan)
+    from . import __version__
+    app = FastAPI(title="项目学习证据助手", version=__version__, lifespan=lifespan)
     app.state.project_store = store
     app.state.source_service = sources
     app.state.task_service = tasks

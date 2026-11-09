@@ -451,6 +451,8 @@ _MODEL_DIAGNOSTICS |= frozenset({"wire.plan_object", "wire.plan_fields", "wire.p
     "wire.plan_duplicate"})
 _MODEL_DIAGNOSTICS |= frozenset({"json.key_trailing_comma", "json.key_single_quote",
                                "json.key_bare_token", "json.key_eof", "json.key_invalid_token"})
+_MODEL_DIAGNOSTICS |= frozenset({"json.extra_object", "json.extra_array",
+                               "json.extra_fence", "json.extra_closer", "json.extra_other"})
 
 # Only exact, implementation-owned validator messages map to public constants.
 # No input, exception context, arbitrary message, key or character position is
