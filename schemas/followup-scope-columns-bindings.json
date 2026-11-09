@@ -8,5 +8,6 @@
   "src/project_evidence/followup_scope_columns.py": "1573100ede88c6167d1610890fbfeffc2736068a5a1a79cd45f21d5cf7ccab7b",
   "src/project_evidence/followup_table_contract.py": "87d2f2c30a42d368ee17e5f65524317255b8cddf3c29a8c1ea6861c0d1b6ab3d",
   "src/project_evidence/followup_prose_kind.py": "64571978697fc1459812f7bbd9635e252e63f2daacfc84735bda7cdda0cf3629",
-  "prompts/learning-guide.txt": "986ceb4d04930248960dd84d68becd905ac7f77f2eb9126aa96ddcf85dab3117"
+  "prompts/learning-guide.txt": "986ceb4d04930248960dd84d68becd905ac7f77f2eb9126aa96ddcf85dab3117",
+  "src/project_evidence/__init__.py": "ea05142be5fed65e173e63278edf521fb87c2c283d588f62cb8a3e2a3ae3ad41"
 }

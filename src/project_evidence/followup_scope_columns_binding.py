@@ -4,7 +4,7 @@ import hashlib,json
 from .agent_protocol import ModelError
 HERE=Path(__file__).resolve().parents[2]
 MANIFEST='schemas/followup-scope-columns-bindings.json'
-EXPECTED='a831a599dca6805b971b6a009f163475d48ab39721e83603ef7607e03d5d72ad'
+EXPECTED='5a22007a46b121252271d346a8857e9e3dea83b65096530168134e4dbd6c1092'
 def verify_inputs():
     try:
         manifest=HERE/MANIFEST
