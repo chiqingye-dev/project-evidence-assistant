@@ -51,6 +51,7 @@ const context = vm.createContext({
     });
   },
 });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../static/learning-content.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../static/app.js'), 'utf8'), context);
 const evaluate = code => vm.runInContext(code, context);
 const flush = () => new Promise(resolve => setImmediate(resolve));

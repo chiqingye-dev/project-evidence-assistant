@@ -46,7 +46,7 @@ def create_app(data_dir: Path | None = None, *, github_transport: httpx.BaseTran
         yield
         tasks.shutdown()
 
-    app = FastAPI(title="项目学习证据助手", version="0.4.1", lifespan=lifespan)
+    app = FastAPI(title="项目学习证据助手", version="0.4.2", lifespan=lifespan)
     app.state.project_store = store
     app.state.source_service = sources
     app.state.task_service = tasks
@@ -286,6 +286,26 @@ def create_app(data_dir: Path | None = None, *, github_transport: httpx.BaseTran
         if not (static_dir / "index.html").is_file():
             raise HTTPException(status_code=503, detail="Local interface is not available yet")
         return FileResponse(static_dir / "index.html")
+
+    @app.get('/static/vendor/mermaid-12.3.0.min.js')
+    def diagram_library(request: Request) -> FileResponse:
+        accepted = []
+        for part in request.headers.get('accept-encoding', '').lower().split(','):
+            name, *options = part.strip().split(';')
+            if name != 'gzip':
+                continue
+            try:
+                quality = next((float(value.strip()[2:]) for value in options if value.strip().startswith('q=')), 1.0)
+            except ValueError:
+                quality = 0
+            if quality > 0:
+                accepted.append(name)
+        compressed = 'gzip' in accepted
+        filename = 'mermaid-12.3.0.min.js' + ('.gz' if compressed else '')
+        headers = {'Vary': 'Accept-Encoding', 'Cache-Control': 'public, max-age=31536000, immutable'}
+        if compressed:
+            headers['Content-Encoding'] = 'gzip'
+        return FileResponse(static_dir / 'vendor' / filename, media_type='text/javascript', headers=headers)
 
     app.mount("/static", StaticFiles(directory=static_dir, check_dir=False), name="static")
     return app

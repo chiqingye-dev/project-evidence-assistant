@@ -5,7 +5,7 @@ from .agent_protocol import ModelError
 from .followup_scope_columns_binding import verify_inputs as verify_production_inputs
 HERE=Path(__file__).resolve().parents[2]
 MANIFEST='schemas/followup-index-columns-bindings.json'
-EXPECTED='dde49ef0a3010ce017c98dac84dab198ac533f21c9639710cac6913b13833de8'
+EXPECTED='7ce0147597c03899d104f2e3fbd7c7ae27d1c33c3199057e65bc11a0f92bc7db'
 def verify_inputs():
     try:
         manifest=HERE/MANIFEST

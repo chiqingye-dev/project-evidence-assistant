@@ -50,6 +50,7 @@ _TIMEOUT_LABELS = (
     (httpx.PoolTimeout, "transport.pool_timeout"),
 )
 GUIDANCE_PATH = Path(__file__).resolve().parents[2] / "prompts" / "directory.txt"
+LEARNING_STYLE_PATH = GUIDANCE_PATH.parent / "learning-guide.txt"
 LEARNING_GUIDANCE_PATHS = {
     OUTLINE_GOAL: GUIDANCE_PATH.parent / "query-outline.txt",
     SECTION_GOAL: GUIDANCE_PATH.parent / "query-section.txt",
@@ -136,6 +137,17 @@ def _load_guidance(goal=GOAL, topic="query", *, two_phase=False):
             raw = stream.read(12_001)
         if not 1 <= len(raw) <= 12_000:
             raise ValueError
+        if goal in {OUTLINE_GOAL, SECTION_GOAL}:
+            style = LEARNING_STYLE_PATH
+            if style.is_symlink() or style.resolve().parent != style.parent:
+                raise ValueError
+            with style.open('rb') as stream:
+                addition = stream.read(6_001)
+            if not 1 <= len(addition) <= 6_000:
+                raise ValueError
+            raw += b'\n\n' + addition
+            if len(raw) > 12_000:
+                raise ValueError
         text = _safe_text(raw.decode("utf-8"))
         return text, hashlib.sha256(raw).hexdigest()
     except (OSError, UnicodeError, ValueError):

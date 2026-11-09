@@ -1538,11 +1538,17 @@ function learningEvidence(parent, references, block = null) {
 
 function renderExplanation(parent, content) {
   for (const block of content.content.blocks || []) {
-    learningText(parent, "h4", block.heading);
-    learningText(parent, "p", block.text, "learning-prose");
+    const question = /^(?:面试问答|面试追问|学习检查|自测)[：:]/.test(block.heading || "");
+    const article = document.createElement(question ? "details" : "section");
+    article.className = question ? "learning-answer" : "learning-block";
+    learningText(article, question ? "summary" : "h4", block.heading);
+    if (question) learningText(article, "p", "参考回答与检查要点 · 阅读不代表已经掌握", "field-help");
+    if (globalThis.LearningContent) globalThis.LearningContent.render(article, block.text);
+    else learningText(article, "p", block.text, "learning-prose");
     const labels = {fact: "源码事实", documentation: "文档说明", inference: "解释性推断", candidate: "候选", gap: "缺口"};
-    learningText(parent, "p", labels[block.support] || "未识别依据", "field-help");
-    learningEvidence(parent, (content.evidence || []).filter(ref => (block.evidence_ids || []).includes(ref.evidence_id)), block);
+    learningText(article, "p", labels[block.support] || "未识别依据", "field-help");
+    learningEvidence(article, (content.evidence || []).filter(ref => (block.evidence_ids || []).includes(ref.evidence_id)), block);
+    parent.append(article);
   }
   const gaps = document.createElement("ul"); setLimitations(gaps, content.content.gaps); parent.append(gaps);
 }

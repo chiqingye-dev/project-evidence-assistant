@@ -1,3 +1,4 @@
 # Source bindings use SHA256 of exact file bytes.
 # Preserve those bytes when committing and checking out on other platforms.
 * -text
+static/vendor/* -diff linguist-vendored
