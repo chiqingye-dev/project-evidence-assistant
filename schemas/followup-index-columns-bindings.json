@@ -1,5 +1,5 @@
 {
-  "src/project_evidence/deepseek_adapter.py": "2329c10b884fa7530ef311ffe6dbdc70df1df87b0c5885b32ef2e1fa39431bd6",
+  "src/project_evidence/deepseek_adapter.py": "7aed117819c594fe4ac40ffe35f5e2c4facd4341276dc790f93ad5174578cdc1",
   "src/project_evidence/agent_engine.py": "0c2e651327be332c4100052c8be30bf5d5f85912ae1ea47d6d76c7407daf260b",
   "src/project_evidence/task_service.py": "9baaaa7541030f760c28d3bf173046d1a6dccd0045eb2f5edd858ea05503f8aa",
   "src/project_evidence/app.py": "f8ca3cd7ef045ca1b1de9d0d9e3f40f8dbd1257981f81cae2a1c853a26cac7b1",
@@ -8,7 +8,8 @@
   "src/project_evidence/followup_index_columns_contract.py": "a6e43e6f80b5cc22ba65357a043fe026da220aab94c17c007fd7000a80a5732b",
   "src/project_evidence/followup_table_contract.py": "87d2f2c30a42d368ee17e5f65524317255b8cddf3c29a8c1ea6861c0d1b6ab3d",
   "src/project_evidence/followup_prose_kind.py": "64571978697fc1459812f7bbd9635e252e63f2daacfc84735bda7cdda0cf3629",
-  "prompts/learning-guide.txt": "1cf6e164cf9c6bfff7de978adce8944a5ee600eb6231b85a40741d74f407bc56",
-  "src/project_evidence/__init__.py": "0d2f69380208815a84527556ccd31fadac89624cbf6491abbf6d5f44c365410e",
-  "src/project_evidence/agent_protocol.py": "f4b8f34c2cb5d573e78ad11d098e7f06849cf6dbb2f7a36fe7ebd2b9d945f57b"
+  "prompts/learning-guide.txt": "40df65f0bba4b453ef182e75b4f3ef14dd04f33152ec3a7fb1ee586ae0dd781e",
+  "src/project_evidence/__init__.py": "dcf6767b964b4c5198e2de381a05fac941ef71ae45e6192805e72378bf71bb25",
+  "src/project_evidence/agent_protocol.py": "da30f4795e5404e5930e739c5ca8b1afd7b9bd33102d2b827113d894d71956d7",
+  "src/project_evidence/source_ranges.py": "9cc257e93380ebe98ed6ce89d167ae3471c562eabb89a5ea7c67a2865f8cd9bd"
 }

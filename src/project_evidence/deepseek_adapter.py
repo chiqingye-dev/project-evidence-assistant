@@ -39,6 +39,7 @@ from .followup_index_columns_binding import verify_inputs as verify_index_inputs
 from .followup_index_columns_contract import MODE as INDEX_FORMAT
 from . import followup_selected_table as selected_table
 from . import followup_table_contract as table_contract
+from .source_ranges import normalize_read_ranges,read_ranges_schema,read_is_permitted
 
 ENDPOINT = "https://api.deepseek.com/chat/completions"
 MODEL = "deepseek-flash"
@@ -198,11 +199,12 @@ class DeepSeekAdapter:
     def __init__(self, api_key: str, ledger: SpendingLedger, grant_id: str, *, transport=None,
                  task_id: str | None = None, enable_query: bool = False, enable_submission: bool = False,
                  enable_consumption: bool = False, enable_judging: bool = False, enable_followup: bool = False,
-                 goal=GOAL, topic="query", followup_protocol="responses", proxy_port=0, followup_claim_format="literal", followup_prose_format="indexed", followup_scope_view="off"):
+                 goal=GOAL, topic="query", followup_protocol="responses", proxy_port=0, followup_claim_format="literal", followup_prose_format="indexed", followup_scope_view="off",section_read_ranges=None):
         self._proxy_port = checked_proxy_port(proxy_port)
         if not isinstance(api_key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,200}", api_key):
             raise ValueError("在本机配置有效API密钥；不要在聊天、URL或日志中填写。")
         self._key, self.ledger, self.grant_id = api_key, ledger, grant_id
+        self._section_read_ranges=normalize_read_ranges(section_read_ranges)
         self._transport, self._task_id = transport, task_id
         self.allowed_topics = frozenset(({"query"} if enable_query else set()) | ({"submission"} if enable_submission else set())
                                        | ({"consumption"} if enable_consumption else set())
@@ -243,7 +245,7 @@ class DeepSeekAdapter:
                                enable_judging="judging" in self.allowed_topics, enable_followup=self.enable_followup,
                                goal=goal, topic=topic, followup_protocol=self.followup_protocol, proxy_port=self._proxy_port,
                                followup_claim_format=self.followup_claim_format, followup_prose_format=self.followup_prose_format,
-                               followup_scope_view=self.followup_scope_view)
+                               followup_scope_view=self.followup_scope_view,section_read_ranges=self._section_read_ranges)
 
     @property
     def network_route(self):
@@ -291,6 +293,8 @@ class DeepSeekAdapter:
             "find_files": FindArguments.model_json_schema(),
             "search_text": SearchArguments.model_json_schema(),
             "read_excerpt": ReadArguments.model_json_schema()}}
+        if context.goal==SECTION_GOAL and self._section_read_ranges:
+            contract['tool_arguments']['read_excerpt']=read_ranges_schema(self._section_read_ranges)
         return contract
 
     def _messages(self, context):
@@ -530,7 +534,12 @@ class DeepSeekAdapter:
                 return PhaseResponse(action, usage)
             action["usage"] = usage.model_dump()
             try:
-                return ModelTurn.model_validate(action)
+                turn=ModelTurn.model_validate(action)
+                if self._goal==SECTION_GOAL and self._section_read_ranges:
+                    for call in turn.tool_calls:
+                        if call.name=='read_excerpt' and not read_is_permitted(self._section_read_ranges,call.arguments):
+                            raise ModelError('invalid_response',usage=usage,diagnostics=('tool.read_outside_range',))
+                return turn
             except ValidationError as error:
                 raise ModelError("invalid_response", usage=usage, diagnostics=schema_diagnostics(error)) from None
         except ModelError as error:
