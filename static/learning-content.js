@@ -39,7 +39,10 @@
       figure.append(original); parent.append(figure); return;
     }
     const resource = `${origin}/static/vendor/mermaid-12.3.0.min.js`;
-    const data = JSON.stringify(source).replace(/</g, '\\u003c');
+    // Mermaid's strict SVG text renderer drops bare '>' inside labels.
+    // Encode only quoted display text; leave graph arrows and stored source intact.
+    const displaySource = source.replace(/"(?:\\.|[^"\\])*"/g, label => label.replace(/>/g, '&gt;'));
+    const data = JSON.stringify(displaySource).replace(/</g, '\\u003c');
     const identifier = `lesson-diagram-${++diagramId}`;
     const onSize = event => {
       const message = event.data;
