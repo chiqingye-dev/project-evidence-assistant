@@ -1,5 +1,5 @@
 {
-  "src/project_evidence/deepseek_adapter.py": "7aed117819c594fe4ac40ffe35f5e2c4facd4341276dc790f93ad5174578cdc1",
+  "src/project_evidence/deepseek_adapter.py": "5f1a4aab3fe9a294af46fe855c1fa883952cf9d3e272dcc3a9246030cd5de2f6",
   "src/project_evidence/agent_engine.py": "0c2e651327be332c4100052c8be30bf5d5f85912ae1ea47d6d76c7407daf260b",
   "src/project_evidence/task_service.py": "9baaaa7541030f760c28d3bf173046d1a6dccd0045eb2f5edd858ea05503f8aa",
   "src/project_evidence/app.py": "f8ca3cd7ef045ca1b1de9d0d9e3f40f8dbd1257981f81cae2a1c853a26cac7b1",
@@ -10,6 +10,6 @@
   "src/project_evidence/followup_prose_kind.py": "64571978697fc1459812f7bbd9635e252e63f2daacfc84735bda7cdda0cf3629",
   "prompts/learning-guide.txt": "f2cb69c7ead3e7d505daa8a923a5f318fad7f481ce01b21b2a4693b3603347a3",
   "src/project_evidence/__init__.py": "7d9e3f66185a97ef0ef98f54c9d0ad735e13451c1306463afba4e644df9817a6",
-  "src/project_evidence/agent_protocol.py": "da30f4795e5404e5930e739c5ca8b1afd7b9bd33102d2b827113d894d71956d7",
+  "src/project_evidence/agent_protocol.py": "4d2d8a66b98eac7ace31cc0aa723eb271cca7b35b07650212110b15397812f2b",
   "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b"
 }
