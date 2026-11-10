@@ -1,6 +1,6 @@
-"""Offline prototype: explicit native functions mapped to the original ModelTurn.
+"""Explicit native functions mapped to the original ModelTurn.
 
-No HTTP, billing or tool execution. This module is not enabled by the adapter.
+Data only: the opt-in adapter owns HTTP, billing and tool execution guards.
 Function names carry action tags; model prose and source references are untouched.
 """
 from copy import deepcopy
@@ -130,9 +130,17 @@ def load_guidance(base=None):
 
 def build_request(context, ranges, *, max_output_tokens=4000):
     context = _context(context)
+    guidance, _ = load_guidance()
+    return request_body(context, ranges, guidance, max_output_tokens=max_output_tokens)
+
+
+def request_body(context, ranges, guidance, *, max_output_tokens):
+    """Use the task's already-frozen host guidance, not a mid-task reload."""
+    context = _context(context)
     if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 4000:
         raise Rejected('budget')
-    guidance, _ = load_guidance()
+    if not isinstance(guidance,str) or not guidance or len(guidance.encode())>12000:
+        raise Rejected('guidance')
     return dict(model='deepseek-flash', stream=False, temperature=0,
         thinking=dict(type='disabled'), max_tokens=max_output_tokens, tool_choice='required',
         tools=functions(context, ranges), messages=[

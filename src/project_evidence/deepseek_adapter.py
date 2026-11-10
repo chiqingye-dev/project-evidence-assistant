@@ -20,6 +20,7 @@ from .followup_request import action_schema, context_view, instruction_contract
 from .followup_wire import schema_projection
 from . import response_protocol
 from . import strict_function_protocol
+from . import section_native_contract
 from .followup_two_phase import PhaseResponse
 from .followup_prose_wire import phase_schema, PROSE_NOTICE
 from .followup_read_context import planning_context_view
@@ -234,18 +235,23 @@ class DeepSeekAdapter:
             raise ValueError("在本机配置有效API密钥；不要在聊天、URL或日志中填写。")
         self._key, self.ledger, self.grant_id = api_key, ledger, grant_id
         self._section_read_ranges=normalize_read_ranges(section_read_ranges)
-        if type(section_protocol) is not str or section_protocol not in {'json_object','function_call'}:
+        if type(section_protocol) is not str or section_protocol not in {'json_object','function_call','named_functions'}:
             raise ValueError('Invalid section transport; no request was sent.')
-        if section_protocol=='function_call' and (not enable_submission or enable_query or enable_consumption
+        if section_protocol in {'function_call','named_functions'} and (not enable_submission or enable_query or enable_consumption
                 or enable_judging or enable_followup or goal!=SECTION_GOAL or topic!='submission'):
             raise ValueError('Function section transport requires an isolated submission section adapter.')
         self.section_protocol=section_protocol
+        if section_protocol=='named_functions' and not self._section_read_ranges:
+            raise ValueError('Named section functions require explicit read ranges.')
+        if section_protocol=='named_functions':
+            from .section_native_binding import verify_inputs as verify_section_inputs
+            verify_section_inputs()
         self._transport, self._task_id = transport, task_id
         self.allowed_topics = frozenset(({"query"} if enable_query else set()) | ({"submission"} if enable_submission else set())
                                        | ({"consumption"} if enable_consumption else set())
                                        | ({"judging"} if enable_judging else set()))
         self.allowed_goals = frozenset({GOAL, OUTLINE_GOAL, SECTION_GOAL} if self.allowed_topics else {GOAL})
-        if self.section_protocol=='function_call':self.allowed_goals=frozenset({SECTION_GOAL})
+        if self.section_protocol in {'function_call','named_functions'}:self.allowed_goals=frozenset({SECTION_GOAL})
         self.enable_followup = bool(enable_followup)
         if followup_protocol not in ("responses", "strict_function", "two_phase") or (followup_protocol != "responses" and not (self.enable_followup and self.allowed_topics)):
             raise ValueError("固定追问传输模式需要先启用追问用途；未发送模型请求。")
@@ -269,7 +275,8 @@ class DeepSeekAdapter:
             raise ValueError("所选主题用途尚未启用；未发送模型请求。")
         self._goal, self._topic = goal, topic
         # Each task freezes its own checked prompt; later tasks may read an update.
-        self._guidance, self.guidance_sha256 = (_load_guidance(goal, topic, two_phase=True)
+        self._guidance, self.guidance_sha256 = (section_native_contract.load_guidance()
+            if section_protocol=='named_functions' else _load_guidance(goal, topic, two_phase=True)
             if goal == FOLLOW_UP_GOAL and followup_protocol == "two_phase" else _load_guidance(goal, topic))
 
     def for_task(self, task_id, *, goal=GOAL, topic="query"):
@@ -335,6 +342,12 @@ class DeepSeekAdapter:
         return contract
 
     def _messages(self, context):
+        if context.goal==SECTION_GOAL and self.section_protocol=='named_functions':
+            try:
+                return section_native_contract.request_body(context,self._section_read_ranges,self._guidance,
+                    max_output_tokens=4000)['messages']
+            except section_native_contract.Rejected:
+                raise ModelError('invalid_response',request_sent=False) from None
         contract = self._contract(context)
         if context.goal == FOLLOW_UP_GOAL and self.followup_protocol == "strict_function":
             return strict_function_protocol.messages(context, contract, self._guidance)
@@ -370,9 +383,16 @@ class DeepSeekAdapter:
             raise ModelError("not_authorized", request_sent=False)
         function_carrier = context.goal == FOLLOW_UP_GOAL and self.followup_protocol == "strict_function"
         section_carrier = context.goal==SECTION_GOAL and self.section_protocol=='function_call'
+        named_section = context.goal==SECTION_GOAL and self.section_protocol=='named_functions'
         responses = context.goal == FOLLOW_UP_GOAL and not function_carrier
-        messages = self._messages(context)
-        if section_carrier:
+        messages = self._messages(context) if not named_section else None
+        if named_section:
+            try:
+                request=section_native_contract.request_body(context,self._section_read_ranges,self._guidance,
+                    max_output_tokens=max_output_tokens)
+            except section_native_contract.Rejected as error:
+                raise ModelError('output_limit' if error.reason=='budget' else 'invalid_response',request_sent=False) from None
+        elif section_carrier:
             # Non-Beta carrier, one forced function; all action validation stays local.
             request=dict(model=MODEL,messages=messages,stream=False,temperature=0,
                 thinking=dict(type='disabled'),max_tokens=max_output_tokens,
@@ -389,8 +409,9 @@ class DeepSeekAdapter:
                        "thinking": {"type": "disabled"}, "temperature": 0,
                        "max_tokens": max_output_tokens, "response_format": {"type": "json_object"}}
         return self._dispatch(request, timeout_seconds, max_output_tokens,
-                              function_carrier=function_carrier or section_carrier, responses=responses,
-                              section_carrier=section_carrier)
+                              function_carrier=function_carrier or section_carrier or named_section, responses=responses,
+                              section_carrier=section_carrier or named_section,
+                              section_context=context if named_section else None)
 
     def generate_phase(self, context, *, phase, payload=None, timeout_seconds, max_output_tokens):
         if self.followup_scope_view != 'off':
@@ -483,8 +504,11 @@ class DeepSeekAdapter:
             raise ModelError('invalid_response', request_sent=False) from None
         return request
 
-    def _dispatch(self, request, timeout_seconds, max_output_tokens, *, function_carrier, responses, phase_response=False,section_carrier=False):
+    def _dispatch(self, request, timeout_seconds, max_output_tokens, *, function_carrier, responses, phase_response=False,section_carrier=False,section_context=None):
         """Exactly one HTTP dispatch, sharing the original receipt/cost guards."""
+        if section_context is not None:
+            from .section_native_binding import verify_inputs as verify_section_inputs
+            verify_section_inputs()
         if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > 128_000:
             raise ModelError("output_limit", request_sent=False, diagnostics=("request.byte_limit",))
         try:
@@ -541,6 +565,12 @@ class DeepSeekAdapter:
             phase = "action"
             if monotonic() >= deadline:
                 raise ModelError("timeout", usage=usage)
+            if section_context is not None:
+                try:
+                    return section_native_contract.decode(envelope,section_context,self._section_read_ranges,usage)
+                except section_native_contract.Rejected as error:
+                    raise ModelError('output_limit' if error.reason=='output_limit' else 'invalid_response',usage=usage,
+                        diagnostics=('section_native.'+error.reason,*error.diagnostics)) from None
             if function_carrier:
                 content = strict_function_protocol.action_text(envelope, usage)
             elif responses:

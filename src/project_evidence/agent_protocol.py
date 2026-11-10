@@ -460,6 +460,10 @@ _MODEL_DIAGNOSTICS |= frozenset({"json.suffix_comma", "json.suffix_colon",
                                "json.suffix_number_start", "json.suffix_letter",
                                "json.suffix_symbol"})
 _MODEL_DIAGNOSTICS |= {'tool.read_outside_range'}
+_MODEL_DIAGNOSTICS |= frozenset('section_native.'+reason for reason in (
+    'context','ranges','schema','guidance','budget','envelope','output_limit',
+    'function_unknown','mixed_actions','call_count','duplicate_id','arguments_json',
+    'arguments_object','arguments_shape','duplicate_field','read_outside_range','native_action_invalid'))
 
 # Only exact, implementation-owned validator messages map to public constants.
 # No input, exception context, arbitrary message, key or character position is

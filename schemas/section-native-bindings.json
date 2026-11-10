@@ -1,0 +1,17 @@
+{
+  "src/project_evidence/agent_protocol.py": "2374160e1f070b3c0fc5f7233ed72f230b96365c1e6eb8a5e46fb06e1907924c",
+  "src/project_evidence/deepseek_adapter.py": "07a5c45683a6ef30e343a0669ecce49e0a7ea1b74f7092f02e1235143bd21e34",
+  "src/project_evidence/section_native_contract.py": "0fe2eec1f2c3254d6d73cb2b4cdfa9853751c4c96d2103d8b50d9978418fc669",
+  "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
+  "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c",
+  "src/project_evidence/agent_engine.py": "0c2e651327be332c4100052c8be30bf5d5f85912ae1ea47d6d76c7407daf260b",
+  "src/project_evidence/task_service.py": "9baaaa7541030f760c28d3bf173046d1a6dccd0045eb2f5edd858ea05503f8aa",
+  "src/project_evidence/learning_contract.py": "c9f22f56a71b61d460053acc0eca826643e2429108a784f18b1b290493fcedfd",
+  "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b",
+  "src/project_evidence/source_policy.py": "1d09a31bab1579975652127dff4d1d479a9a2c707cd09da9e612c3cb6734bc7c",
+  "src/project_evidence/tools.py": "bc12eeb812dfb442aba30da5eb84ee16d936db1a7bcadd1c09bdbebd680efeb9",
+  "src/project_evidence/spending.py": "d604273210654d8604ab32d2fe8202fa96cc67bf5050f2ad6b3b4427698dffc5",
+  "src/project_evidence/storage.py": "f8376405c4713fa8f0658459be3fe6dff3fa084dec84da2c6344a3b2640418eb",
+  "src/project_evidence/strict_function_protocol.py": "579a0c289c9d7fa2082e499b7922d4b7cbc0c3a488bc4bfa4f653050af891792",
+  "prompts/learning-guide.txt": "f2cb69c7ead3e7d505daa8a923a5f318fad7f481ce01b21b2a4693b3603347a3"
+}
