@@ -1,8 +1,8 @@
 {
   "src/project_evidence/deepseek_adapter.py": "07a5c45683a6ef30e343a0669ecce49e0a7ea1b74f7092f02e1235143bd21e34",
   "src/project_evidence/agent_engine.py": "0c2e651327be332c4100052c8be30bf5d5f85912ae1ea47d6d76c7407daf260b",
-  "src/project_evidence/task_service.py": "9baaaa7541030f760c28d3bf173046d1a6dccd0045eb2f5edd858ea05503f8aa",
-  "src/project_evidence/app.py": "f8ca3cd7ef045ca1b1de9d0d9e3f40f8dbd1257981f81cae2a1c853a26cac7b1",
+  "src/project_evidence/task_service.py": "309736f2aa7e4e41552e78e7eb08ba266233132186e962e1fa3d8f017fe0afd9",
+  "src/project_evidence/app.py": "056ce9d35af8e7299f4cdc52e93cfcd9391a805480f276bf11f2ca47ccde4034",
   "src/project_evidence/followup_scope_columns_codec.py": "4ac7bc265d107ed738bcfcf5d4b31d451916fd680ac34e29c81f8b1ed3a7cbaf",
   "src/project_evidence/followup_scope_columns_baseline.py": "ae2c82a2f717f820cae0cffa042d1189a7c67c8ed3c1fbaaf319791486fd8fbe",
   "src/project_evidence/followup_scope_columns.py": "1573100ede88c6167d1610890fbfeffc2736068a5a1a79cd45f21d5cf7ccab7b",
@@ -13,7 +13,12 @@
   "src/project_evidence/agent_protocol.py": "2374160e1f070b3c0fc5f7233ed72f230b96365c1e6eb8a5e46fb06e1907924c",
   "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b",
   "src/project_evidence/section_native_contract.py": "0fe2eec1f2c3254d6d73cb2b4cdfa9853751c4c96d2103d8b50d9978418fc669",
-  "src/project_evidence/section_native_binding.py": "07ca2fd4839454f7148a8582b3b07871be8a67853f814518e26a9734e176c8dc",
+  "src/project_evidence/section_native_binding.py": "4bdbf2015614cceaa87b4873a1fc6de35278d4b6454862ae7ceac6eff2ea9229",
   "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
-  "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c"
+  "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c",
+  "src/project_evidence/task_storage.py": "bcf4cfa2cc5b4af6214195142c7e01e292490763acda0e43a0f37bcc1b6fbea1",
+  "src/project_evidence/section_review.py": "007c9594b0c64a75870d92ba0f6782295aba0a646bc452db954bfe58e0a9240d",
+  "src/project_evidence/call_binding.py": "bcd5777a0dca36225753a3fc25582b984df7eefb60c367defa6a6a1dc3e05450",
+  "src/project_evidence/call_claim_contract.py": "85ce66cba00300a40a15641c547bd5466b152abfb396c7b0b8a32848db54d441",
+  "src/project_evidence/call_evidence.py": "6d64ba2c21ef2b40595e8ae7f97ac566f75dafe0e8d1b3a11f9fd53f933d066e"
 }

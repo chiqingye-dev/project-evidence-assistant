@@ -863,7 +863,7 @@ function taskIsActive(task) {
 }
 
 function taskStatusText(status) {
-  return ({ queued: "排队中", running: "运行中", completed: "已结束 · 有结果", gap: "证据有缺口", needs_clarification: "需要澄清", denied: "已拒绝", no_progress: "无进展，已停止", cancelled: "已取消", budget_exhausted: "达到任务上限", timeout: "超过任务时限", failed: "任务失败", source_changed: "来源变化，已停止", unverified: "源码未核对", interrupted: "运行中断" })[status] || "状态未确认";
+  return ({ queued: "排队中", running: "运行中", completed: "已结束 · 有结果", needs_review: "候选待复核 · 未发布", gap: "证据有缺口", needs_clarification: "需要澄清", denied: "已拒绝", no_progress: "无进展，已停止", cancelled: "已取消", budget_exhausted: "达到任务上限", timeout: "超过任务时限", failed: "任务失败", source_changed: "来源变化，已停止", unverified: "源码未核对", interrupted: "运行中断" })[status] || "状态未确认";
 }
 
 function updateTaskControls() {

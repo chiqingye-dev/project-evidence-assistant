@@ -162,8 +162,10 @@ class TaskStore:
     def update(self, project_id, task_id, *, status: str | None = None,
                message: str | None = None, event: dict | None = None,
                counters: dict | None = None, result: dict | None = None,
-               evidence: list[dict] | None = None, publish=None) -> bool:
+               evidence: list[dict] | None = None, publish=None, hold=None) -> bool:
         """CAS on active state and source version; late workers cannot resurrect tasks."""
+        if hold is not None and (status!='needs_review' or publish is not None):
+            raise ValueError('only_held_task_can_store_candidate')
         with self.projects._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("""SELECT agent_tasks.payload_json, projects.commit_sha
@@ -205,6 +207,10 @@ class TaskStore:
                 if payload["status"] != "completed":
                     raise ValueError("only_completed_task_can_publish")
                 publish(connection)
+            if hold is not None:
+                if payload['status']!='needs_review' or publish is not None:
+                    raise ValueError('only_held_task_can_store_candidate')
+                hold(connection)
         return True
 
     def stop_project(self, project_id, status: str, message: str) -> None:

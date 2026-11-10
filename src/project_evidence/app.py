@@ -33,12 +33,12 @@ class DirectoryTaskRequest(BaseModel):
 
 
 def create_app(data_dir: Path | None = None, *, github_transport: httpx.BaseTransport | None = None,
-               git_executable: str | None = None, model_adapter=None) -> FastAPI:
+               git_executable: str | None = None, model_adapter=None, section_review_policy=None) -> FastAPI:
     project_root = Path(__file__).resolve().parents[2]
     static_dir = project_root / "static"
     store = ProjectStore(data_dir if data_dir is not None else project_root / "data")
     sources = SourceService(store, PublicGitHubVerifier(github_transport), git_executable)
-    tasks = TaskService(store, sources, model_adapter)
+    tasks = TaskService(store, sources, model_adapter,section_review_policy=section_review_policy)
     reading = ReadingProgress(store)
 
     @asynccontextmanager

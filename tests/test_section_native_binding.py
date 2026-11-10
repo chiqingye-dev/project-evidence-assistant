@@ -31,6 +31,9 @@ def test_native_seal_and_both_original_followup_seals():
     'src/project_evidence/agent_engine.py','src/project_evidence/source_ranges.py',
     'src/project_evidence/section_native_contract.py','src/project_evidence/trial_readiness.py',
     'prompts/submission-native-section.txt','prompts/learning-guide.txt',
+    'src/project_evidence/app.py','src/project_evidence/task_service.py','src/project_evidence/task_storage.py',
+    'src/project_evidence/section_review.py','src/project_evidence/call_binding.py',
+    'src/project_evidence/call_claim_contract.py','src/project_evidence/call_evidence.py',
 ])
 def test_input_drift_blocks_opt_in_construction_before_any_request(tmp_path,monkeypatch,name):
     copy_inputs(tmp_path/'sealed',monkeypatch)

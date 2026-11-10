@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import sqlite3
 from threading import Event, RLock, Thread
+import time
 
 from .agent_engine import run_agent
 from .agent_protocol import (AgentBudget, ModelContext, UnconfiguredAdapter, DirectoryOutput,
@@ -18,12 +19,17 @@ from .source_service import SourceService
 from .storage import ProjectStore
 from .task_storage import ACTIVE, MAX_TASK_RECORDS, TaskStore
 from .task_diagnostics import engine_metadata
+from .section_review import ReviewPolicy, AcceptedReads, HeldReviewStore
 
 
 class TaskService:
-    def __init__(self, projects: ProjectStore, sources: SourceService, adapter=None) -> None:
+    def __init__(self, projects: ProjectStore, sources: SourceService, adapter=None, *, section_review_policy=None) -> None:
         self.projects, self.sources = projects, sources
         self.history = TaskStore(projects)
+        if section_review_policy is not None and type(section_review_policy) is not ReviewPolicy:
+            raise ValueError('section_review_policy')
+        self.section_review_policy=section_review_policy
+        self.held_reviews=HeldReviewStore(projects,create=section_review_policy is not None)
         self.learning = LearningStore(projects)
         self.adapter = adapter if adapter is not None else UnconfiguredAdapter()
         self.limits = AgentBudget()
@@ -34,8 +40,11 @@ class TaskService:
         self._active_task: str | None = None
 
     def _display(self, record, task: dict) -> dict:
-        return dict(task, review_status="current" if task["commit"] == record.commit else "needs_review",
-                    source_verified=self.sources.active(record))
+        value=dict(task, review_status="current" if task["commit"] == record.commit else "needs_review",
+                   source_verified=self.sources.active(record))
+        held=self.held_reviews.summary(record.id,task['id'])
+        if held is not None:value['candidate_review']=held
+        return value
 
     def list(self, record, *, limit=100, offset=0) -> list[dict]:
         return [self._display(record, task) for task in self.history.list(record.id, limit=limit, offset=offset)]
@@ -168,6 +177,8 @@ class TaskService:
                     return {"status": f"{anchor.topic}_model_not_enabled",
                             "message": "所选主题的付费用途尚未启用；没有启动任务或模型请求。"}
                 context = ModelContext(commit=record.commit, public_url=record.public_url, goal=goal, anchor=anchor)
+                if goal==SECTION_GOAL and self.section_review_policy is not None:
+                    self.section_review_policy.scope(record,'pending',anchor)
             except ValueError:
                 return {"status": "invalid_selection", "message": "所选目录、查询章节或小节不属于当前有效版本；没有启动任务。"}
             identity = self.sources.session_identity(record)
@@ -188,6 +199,13 @@ class TaskService:
             return self._display(record, task)
 
     def _run(self, record, task_id: str, identity, cancellation: Event, context: ModelContext) -> None:
+        started=time.monotonic()
+        collector=None
+        payload=None
+        def failed_candidate():
+            # Retain a structurally validated original in the failed task when
+            # freezing/storage fails. It is not a learning record or approval.
+            return payload.get('final_output') if collector is not None and payload is not None and payload.get('status')=='completed' else None
         def cancelled() -> bool:
             task = self.history.get(record.id, task_id)
             return cancellation.is_set() or task is None or task["status"] not in ACTIVE
@@ -203,7 +221,8 @@ class TaskService:
             guard()
             tools = self.sources.tools(record)
             methods = {"find_files": tools.find_files, "search_text": tools.search_text, "read_excerpt": tools.read_excerpt}
-            result = methods[name](**arguments)
+            result = (collector.read(tools,arguments) if collector is not None and name=='read_excerpt'
+                      else methods[name](**arguments))
             guard()
             if name == "read_excerpt" and result.get("status") == "ok" and result.get("text"):
                 with self._lock:
@@ -214,6 +233,7 @@ class TaskService:
                         except (sqlite3.IntegrityError, ValueError):
                             raise SourceError("budget_exhausted", "证据保存未完成或容量达到上限，任务停止。") from None
                         result["evidence_id"] = saved["id"]
+                        if collector is not None:collector.saved(result,saved)
             return result
 
         def record_event(event: dict) -> None:
@@ -223,12 +243,18 @@ class TaskService:
                 if key in details:
                     safe[key] = details[key]
             safe.update(engine_metadata(event))
-            self.history.update(record.id, task_id, event=safe, counters=event.get("counters", {}))
+            stored=self.history.update(record.id, task_id, event=safe, counters=event.get("counters", {}))
             self.history.record_counters(record.id, task_id, event.get("counters", {}))
+            if collector is not None:
+                if not stored:return False
+                collector.accept(event)
 
         try:
             if not self.history.update(record.id, task_id, status="running", message="正在按固定公开版本查证；引用是否支持结论仍需验收。"):
                 return
+            if context.goal==SECTION_GOAL and self.section_review_policy is not None:
+                guard()
+                collector=AcceptedReads(self.section_review_policy.scope(record,task_id,context.anchor))
             # No local path, registration name, secrets, or historical unverified text.
             adapter = (self.adapter.for_task(task_id, goal=context.goal, topic=context.anchor.topic) if context.goal != GOAL
                        else self.adapter.for_task(task_id)) if hasattr(self.adapter, "for_task") else self.adapter
@@ -245,18 +271,30 @@ class TaskService:
                 if not cancelled():
                     guard()
                     with self.sources.checked_session(record, identity):
+                        held=None
+                        if collector is not None and status=='completed':
+                            held=collector.freeze(payload['final_output'],payload['evidence'])
+                            guard()
+                            if cancelled():return
+                            if time.monotonic()-started>=self.limits.max_seconds:
+                                raise SourceError('timeout','冻结复核超过任务时间上限。')
+                            status='needs_review'
+                            payload['message']='正文候选已冻结待源码复核；未发布学习正文，不能将句法检查当成语义通过。'
                         self.history.update(record.id, task_id, status=status, message=payload["message"],
                                             counters=payload["counters"], result=payload.get("final_output"),
                                             evidence=payload.get("evidence", []),
                                             publish=(lambda connection: self.learning.save_from_task(record.id, task_id, transaction=connection))
-                                            if status == "completed" and context.goal != GOAL else None)
+                                            if status == "completed" and context.goal != GOAL else None,
+                                            hold=(lambda connection:self.held_reviews.save(connection,held)) if held is not None else None)
         except SourceError as error:
             with self._lock:
-                status = error.code if error.code in {"source_changed", "unverified", "denied", "budget_exhausted"} else "failed"
-                self.history.update(record.id, task_id, status=status, message="来源许可、版本或证据保存门禁使任务停止；没有发布新内容。")
+                status = error.code if error.code in {"source_changed", "unverified", "denied", "budget_exhausted", "timeout"} else "failed"
+                self.history.update(record.id, task_id, status=status, message="来源许可、版本或证据保存门禁使任务停止；没有发布新内容。",
+                                    result=failed_candidate() if status in {'budget_exhausted','timeout'} else None)
         except Exception:
             # Never persist raw adapter/SQL/network errors: they can contain secrets.
-            self.history.update(record.id, task_id, status="failed", message="任务未完成，未保存异常原文；请检查配置和有限边界。")
+            self.history.update(record.id, task_id, status="failed", message="任务未完成，未保存异常原文；请检查配置和有限边界。",
+                                result=failed_candidate())
         finally:
             with self._lock:
                 if self._active_task == task_id:
