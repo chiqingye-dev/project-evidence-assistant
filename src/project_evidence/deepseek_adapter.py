@@ -68,6 +68,13 @@ JUDGING_GUIDANCE_PATHS = {
     OUTLINE_GOAL: GUIDANCE_PATH.parent / "judging-outline.txt",
     SECTION_GOAL: GUIDANCE_PATH.parent / "judging-section.txt",
 }
+SECTION_FUNCTION_NOTICE = (
+    '\nsection_function_v1运输约定：本轮只返回一次submit_action函数调用，content必须为空。'
+    '函数arguments是完整的原kind=tools或kind=final动作对象，不增加action外层。'
+    '前述JSON单对象及示例要求适用于arguments，不要在content再写JSON、说明或围栏。'
+    'submit_action只是动作的数据封装，没有执行权限；实际只读工具请求仍放在tool_calls中，'
+    '由原受控循环校验路径、范围、引用和预算后执行。禁止原生调用其他函数。\n'
+)
 
 
 def _json_diagnostic(error: json.JSONDecodeError) -> str:
@@ -221,17 +228,24 @@ class DeepSeekAdapter:
     def __init__(self, api_key: str, ledger: SpendingLedger, grant_id: str, *, transport=None,
                  task_id: str | None = None, enable_query: bool = False, enable_submission: bool = False,
                  enable_consumption: bool = False, enable_judging: bool = False, enable_followup: bool = False,
-                 goal=GOAL, topic="query", followup_protocol="responses", proxy_port=0, followup_claim_format="literal", followup_prose_format="indexed", followup_scope_view="off",section_read_ranges=None):
+                 goal=GOAL, topic="query", followup_protocol="responses", proxy_port=0, followup_claim_format="literal", followup_prose_format="indexed", followup_scope_view="off",section_read_ranges=None,section_protocol="json_object"):
         self._proxy_port = checked_proxy_port(proxy_port)
         if not isinstance(api_key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,200}", api_key):
             raise ValueError("在本机配置有效API密钥；不要在聊天、URL或日志中填写。")
         self._key, self.ledger, self.grant_id = api_key, ledger, grant_id
         self._section_read_ranges=normalize_read_ranges(section_read_ranges)
+        if type(section_protocol) is not str or section_protocol not in {'json_object','function_call'}:
+            raise ValueError('Invalid section transport; no request was sent.')
+        if section_protocol=='function_call' and (not enable_submission or enable_query or enable_consumption
+                or enable_judging or enable_followup or goal!=SECTION_GOAL or topic!='submission'):
+            raise ValueError('Function section transport requires an isolated submission section adapter.')
+        self.section_protocol=section_protocol
         self._transport, self._task_id = transport, task_id
         self.allowed_topics = frozenset(({"query"} if enable_query else set()) | ({"submission"} if enable_submission else set())
                                        | ({"consumption"} if enable_consumption else set())
                                        | ({"judging"} if enable_judging else set()))
         self.allowed_goals = frozenset({GOAL, OUTLINE_GOAL, SECTION_GOAL} if self.allowed_topics else {GOAL})
+        if self.section_protocol=='function_call':self.allowed_goals=frozenset({SECTION_GOAL})
         self.enable_followup = bool(enable_followup)
         if followup_protocol not in ("responses", "strict_function", "two_phase") or (followup_protocol != "responses" and not (self.enable_followup and self.allowed_topics)):
             raise ValueError("固定追问传输模式需要先启用追问用途；未发送模型请求。")
@@ -267,7 +281,8 @@ class DeepSeekAdapter:
                                enable_judging="judging" in self.allowed_topics, enable_followup=self.enable_followup,
                                goal=goal, topic=topic, followup_protocol=self.followup_protocol, proxy_port=self._proxy_port,
                                followup_claim_format=self.followup_claim_format, followup_prose_format=self.followup_prose_format,
-                               followup_scope_view=self.followup_scope_view,section_read_ranges=self._section_read_ranges)
+                               followup_scope_view=self.followup_scope_view,section_read_ranges=self._section_read_ranges,
+                               section_protocol=self.section_protocol)
 
     @property
     def network_route(self):
@@ -324,6 +339,8 @@ class DeepSeekAdapter:
         if context.goal == FOLLOW_UP_GOAL and self.followup_protocol == "strict_function":
             return strict_function_protocol.messages(context, contract, self._guidance)
         wire_instruction = response_protocol.WIRE_INSTRUCTION if context.goal == FOLLOW_UP_GOAL else ""
+        if context.goal==SECTION_GOAL and self.section_protocol=='function_call':
+            wire_instruction=SECTION_FUNCTION_NOTICE
         if context.goal == FOLLOW_UP_GOAL:
             contract = instruction_contract(contract)
         instruction = context.system_instruction + self._guidance + wire_instruction + json.dumps(contract, ensure_ascii=False)
@@ -352,9 +369,18 @@ class DeepSeekAdapter:
         if context.goal == FOLLOW_UP_GOAL and self.followup_protocol == "two_phase":
             raise ModelError("not_authorized", request_sent=False)
         function_carrier = context.goal == FOLLOW_UP_GOAL and self.followup_protocol == "strict_function"
+        section_carrier = context.goal==SECTION_GOAL and self.section_protocol=='function_call'
         responses = context.goal == FOLLOW_UP_GOAL and not function_carrier
         messages = self._messages(context)
-        if function_carrier:
+        if section_carrier:
+            # Non-Beta carrier, one forced function; all action validation stays local.
+            request=dict(model=MODEL,messages=messages,stream=False,temperature=0,
+                thinking=dict(type='disabled'),max_tokens=max_output_tokens,
+                tools=[dict(type='function',function=dict(name=strict_function_protocol.CARRIER,strict=False,
+                    description='Submit one bounded action as data; this function executes nothing.',
+                    parameters=self._contract(context)['turn']))],
+                tool_choice=dict(type='function',function=dict(name=strict_function_protocol.CARRIER)))
+        elif function_carrier:
             request = strict_function_protocol.request_body(MODEL, messages, self._contract(context)["turn"], max_output_tokens)
         elif responses:
             request = response_protocol.request_body(MODEL, messages, self._contract(context)["turn"], max_output_tokens)
@@ -363,7 +389,8 @@ class DeepSeekAdapter:
                        "thinking": {"type": "disabled"}, "temperature": 0,
                        "max_tokens": max_output_tokens, "response_format": {"type": "json_object"}}
         return self._dispatch(request, timeout_seconds, max_output_tokens,
-                              function_carrier=function_carrier, responses=responses)
+                              function_carrier=function_carrier or section_carrier, responses=responses,
+                              section_carrier=section_carrier)
 
     def generate_phase(self, context, *, phase, payload=None, timeout_seconds, max_output_tokens):
         if self.followup_scope_view != 'off':
@@ -456,7 +483,7 @@ class DeepSeekAdapter:
             raise ModelError('invalid_response', request_sent=False) from None
         return request
 
-    def _dispatch(self, request, timeout_seconds, max_output_tokens, *, function_carrier, responses, phase_response=False):
+    def _dispatch(self, request, timeout_seconds, max_output_tokens, *, function_carrier, responses, phase_response=False,section_carrier=False):
         """Exactly one HTTP dispatch, sharing the original receipt/cost guards."""
         if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > 128_000:
             raise ModelError("output_limit", request_sent=False, diagnostics=("request.byte_limit",))
@@ -474,7 +501,8 @@ class DeepSeekAdapter:
             with httpx.Client(transport=self._transport, trust_env=False, follow_redirects=False,
                               timeout=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 5.0)),
                               **client_options(self._proxy_port)) as client:
-                endpoint = strict_function_protocol.ENDPOINT if function_carrier else response_protocol.ENDPOINT if responses else ENDPOINT
+                endpoint = (ENDPOINT if section_carrier else strict_function_protocol.ENDPOINT if function_carrier
+                            else response_protocol.ENDPOINT if responses else ENDPOINT)
                 with client.stream("POST", endpoint, json=request,
                                    headers={"Authorization": "Bearer " + self._key}) as response:
                     if response.status_code != 200:
@@ -547,7 +575,8 @@ class DeepSeekAdapter:
                 else:
                     action = response_protocol.parse_action(content, usage)
             else:
-                action = response_protocol.parse_action(content, usage) if responses or function_carrier else json.loads(content)
+                action = (json.loads(content) if section_carrier else
+                          response_protocol.parse_action(content, usage) if responses or function_carrier else json.loads(content))
             if not isinstance(action, dict):
                 raise ModelError("invalid_response", usage=usage, diagnostics=("action.not_object",))
             if "usage" in action:
