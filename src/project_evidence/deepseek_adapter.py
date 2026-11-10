@@ -128,7 +128,8 @@ def _json_extra_details(error: json.JSONDecodeError) -> tuple[str, ...]:
     """Classify the first rejected suffix token; never parse or repair it.
 
     Fixed labels contain no response text, keys, values, positions or sizes.
-    An older extra_data label alone cannot establish this more specific cause.
+    Older extra_other events cannot be retroactively assigned a suffix class.
+    Only inspect the parser's rejected position, never decode a valid prefix.
     """
     if error.msg != "Extra data":
         return ()
@@ -144,7 +145,28 @@ def _json_extra_details(error: json.JSONDecodeError) -> tuple[str, ...]:
         return ("json.extra_array",)
     if token in "}]":
         return ("json.extra_closer",)
-    return ("json.extra_other",)
+    if token == ',':
+        detail = 'json.suffix_comma'
+    elif token == ':':
+        detail = 'json.suffix_colon'
+    elif token == '"':
+        detail = 'json.suffix_double_quote'
+    elif token == "'":
+        detail = 'json.suffix_single_quote'
+    elif token == '\\':
+        detail = ('json.suffix_escaped_whitespace' if pos + 1 < len(text) and text[pos + 1] in 'nrt'
+                  else 'json.suffix_backslash')
+    elif token == '\ufeff':
+        detail = 'json.suffix_bom'
+    elif token.isspace():
+        detail = 'json.suffix_nonjson_whitespace'
+    elif token in '0123456789-':
+        detail = 'json.suffix_number_start'
+    elif token.isalpha():
+        detail = 'json.suffix_letter'
+    else:
+        detail = 'json.suffix_symbol'
+    return ('json.extra_other', detail)
 
 
 def _load_guidance(goal=GOAL, topic="query", *, two_phase=False):

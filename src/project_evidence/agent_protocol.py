@@ -453,6 +453,12 @@ _MODEL_DIAGNOSTICS |= frozenset({"json.key_trailing_comma", "json.key_single_quo
                                "json.key_bare_token", "json.key_eof", "json.key_invalid_token"})
 _MODEL_DIAGNOSTICS |= frozenset({"json.extra_object", "json.extra_array",
                                "json.extra_fence", "json.extra_closer", "json.extra_other"})
+_MODEL_DIAGNOSTICS |= frozenset({"json.suffix_comma", "json.suffix_colon",
+                               "json.suffix_double_quote", "json.suffix_single_quote",
+                               "json.suffix_escaped_whitespace", "json.suffix_backslash",
+                               "json.suffix_bom", "json.suffix_nonjson_whitespace",
+                               "json.suffix_number_start", "json.suffix_letter",
+                               "json.suffix_symbol"})
 _MODEL_DIAGNOSTICS |= {'tool.read_outside_range'}
 
 # Only exact, implementation-owned validator messages map to public constants.
