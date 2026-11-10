@@ -60,6 +60,8 @@ def _tokens(source):
         if match is None:raise Unsupported('unsupported_source')
         word=match[0]
         if any(ord(c)>127 for c in word):raise Unsupported('unsupported_identifier')
+        if len(word)==1 and not (word.isalnum() or word in '_${}()[];,.=<>!+-*/%&|^~?:@'):
+            raise Unsupported('unsupported_token')
         if word[0].isdigit():word='<number>'
         out.append((word,line));i=match.end()
     return out
@@ -114,30 +116,42 @@ def calls(window):
     if type(window.start_line) is not int or not 1<=window.start_line<=1000000:raise ValueError('invalid_line')
     if window.lexical_context_verified is not True:return {'status':'context_unverified','calls':[]}
     try:
-        tokens=_tokens(window.text);pairs=_paired(tokens);values=[]
-        for i,(word,line) in enumerate(tokens):
-            if not re.fullmatch(IDENT,word) or word in SKIP or i+1 not in pairs or tokens[i+1][0]!='(':continue
-            right=pairs[i+1]
-            if right+1<len(tokens) and tokens[right+1][0]=='{':continue  # declaration, conservative omission
-            if i and tokens[i-1][0] in ('new','@'):continue
-            qualified=i>0 and tokens[i-1][0]=='.'
-            if not qualified and i and (re.fullmatch(IDENT,tokens[i-1][0]) or tokens[i-1][0] in ('>',']')):
-                if tokens[i-1][0] not in ('return','throw','yield'):continue  # declaration-shaped fragment
-            start=i
-            while start>=2 and tokens[start-1][0]=='.' and re.fullmatch(IDENT,tokens[start-2][0]):start-=2
-            name=''.join(t[0] for t in tokens[start:i+1]);_safe_text(name)
-            arguments=_arguments(tokens,i+1,right,pairs)
-            limited=any(word in ('<','>') for word,_ in tokens[i+2:right])
-            explicit=not limited and any(_explicit_argument(tokens,a,b,pairs) for a,b in arguments)
-            values.append(dict(callee=name,name=word,evidence_id=window.evidence_id,path=window.path,
-                start_line=window.start_line+line-1,end_line=window.start_line+tokens[right][1]-1,
-                argument_count=None if limited else len(arguments),passing='explicit_callable' if explicit else 'unknown',
-                syntax_scope='unsupported_angle_form' if limited else 'bounded_arguments',
-                registration='unverified',execution_timing='unverified'))
-            if len(values)>64:raise Unsupported('call_limit')
-        return {'status':'bounded_syntax_only','calls':values}
+        tokens=_tokens(window.text);pairs=_paired(tokens)
+        return {'status':'bounded_syntax_only','calls':_extract_calls(tokens,pairs,window)}
     except Unsupported as error:return {'status':str(error),'calls':[]}
     except ValueError:return {'status':'unsafe_label','calls':[]}
+
+
+def _extract_calls(tokens,pairs,window,allowed_lines=None):
+    """Internal: only emit call syntax fully inside one admitted read span.
+
+    Whole-blob tokens supply lexical context/pairs, never outside call facts.
+    """
+    values=[]
+    for i,(word,line) in enumerate(tokens):
+        if allowed_lines and not allowed_lines[0]<=line<=allowed_lines[1]:continue
+        if not re.fullmatch(IDENT,word) or word in SKIP or i+1 not in pairs or tokens[i+1][0]!='(':continue
+        right=pairs[i+1]
+        if allowed_lines and tokens[right][1]>allowed_lines[1]:continue
+        if right+1<len(tokens) and tokens[right+1][0]=='{':continue  # declaration, conservative omission
+        if i and tokens[i-1][0] in ('new','@'):continue
+        qualified=i>0 and tokens[i-1][0]=='.'
+        if not qualified and i and (re.fullmatch(IDENT,tokens[i-1][0]) or tokens[i-1][0] in ('>',']')):
+            if tokens[i-1][0] not in ('return','throw','yield'):continue  # declaration-shaped fragment
+        start=i
+        while start>=2 and tokens[start-1][0]=='.' and re.fullmatch(IDENT,tokens[start-2][0]):start-=2
+        if allowed_lines and tokens[start][1]<allowed_lines[0]:continue
+        name=''.join(t[0] for t in tokens[start:i+1]);_safe_text(name)
+        arguments=_arguments(tokens,i+1,right,pairs)
+        limited=any(word in ('<','>') for word,_ in tokens[i+2:right])
+        explicit=not limited and any(_explicit_argument(tokens,a,b,pairs) for a,b in arguments)
+        values.append(dict(callee=name,name=word,evidence_id=window.evidence_id,path=window.path,
+            start_line=window.start_line+line-1,end_line=window.start_line+tokens[right][1]-1,
+            argument_count=None if limited else len(arguments),passing='explicit_callable' if explicit else 'unknown',
+            syntax_scope='unsupported_angle_form' if limited else 'bounded_arguments',
+            registration='unverified',execution_timing='unverified',site_index=len(values)+1))
+        if len(values)>64:raise Unsupported('call_limit')
+    return values
 
 
 def _uncertainty_only(unit,first_term):
@@ -166,6 +180,11 @@ def audit(blocks,windows):
     for window in windows:
         if window.evidence_id in sources:raise ValueError('duplicate_evidence')
         sources[window.evidence_id]=calls(window)
+    return _audit_sources(blocks,sources)
+
+
+def _audit_sources(blocks,sources):
+    if not isinstance(blocks,list) or not 1<=len(blocks)<=12:raise ValueError('review_limit')
     findings=[];evaluated=[];chars=0
     for block_index,block in enumerate(blocks,1):
         text=block.get('text');ids=block.get('evidence_ids')
@@ -191,7 +210,7 @@ def audit(blocks,windows):
                 for call in sources.get(identifier,{}).get('calls',[]):
                     if any(name==call['callee'] or '.' not in name and name==call['name'] for name in mentioned):
                         candidates.append(call)
-            unique={(c['evidence_id'],c['start_line'],c['callee']):c for c in candidates}
+            unique={(c['evidence_id'],c.get('site_index'),c['start_line'],c['callee']):c for c in candidates}
             if len(unique)!=1:
                 findings.append(dict(item,reason='missing_or_ambiguous_call_evidence'));continue
             call=next(iter(unique.values()))
@@ -211,12 +230,21 @@ def audit(blocks,windows):
 
 def audit_output(output,windows):
     """Cover section title, block heading/text (including diagrams) and gaps."""
+    if not isinstance(windows,list) or len(windows)>16:raise ValueError('review_limit')
+    sources={}
+    for window in windows:
+        if window.evidence_id in sources:raise ValueError('duplicate_evidence')
+        sources[window.evidence_id]=calls(window)
+    return _audit_output_sources(output,sources)
+
+
+def _audit_output_sources(output,sources):
     if not isinstance(output,dict) or not isinstance(output.get('title'),str):raise ValueError('invalid_output')
     gaps=output.get('gaps',[])
     if not isinstance(gaps,list) or len(gaps)>12 or any(not isinstance(g,str) for g in gaps):raise ValueError('invalid_output')
-    result=audit(output.get('blocks'),windows)
+    result=_audit_sources(output.get('blocks'),sources)
     for field,text in [('title',output['title']),*[(f'gaps.{i}',g) for i,g in enumerate(gaps,1)]]:
-        extra=audit([dict(text=text,evidence_ids=[])],windows)
+        extra=_audit_sources([dict(text=text,evidence_ids=[])],sources)
         for key in ('findings','evaluated'):
             result[key].extend(dict(item,field=field,block=None) for item in extra[key])
     if len(result['findings'])+len(result['evaluated'])>256:raise ValueError('review_limit')

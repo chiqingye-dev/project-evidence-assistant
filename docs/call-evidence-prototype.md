@@ -6,11 +6,13 @@ Java execution, database writes or response repair. `within_prototype_scope`
 never means semantic acceptance or publication approval; `publication_approval`
 and `semantic_verified` remain false for every outcome.
 
-The trusted caller supplies immutable task-evidence windows and must establish
-their lexical starting context. Unknown context fails closed. This prototype
-does not implement that trusted extraction/binding step. The real-output replay
-uses a manually reviewed, evidence-contained two-line statement; it does not
-claim to have automated source-window selection.
+The original low-level `Window` interface remains for bounded syntax fixtures.
+Production callers must not treat its manually supplied context flag as proof.
+The separate host-only `call_binding.py` now binds engine-accepted reads and
+exact chunks to source-session blob seals, derives lexical context automatically,
+and exports only calls wholly inside those reads. Its opaque result cannot be
+rehydrated from model JSON. See `call-evidence-binding.md`. The original manual
+replay is historical evidence; the new replay binds all five actual reads.
 
 The bounded Java tokenizer masks comments, strings and text blocks; rejects
 incomplete/unsupported forms; and distinguishes an explicit lambda/method
@@ -29,10 +31,12 @@ is intentionally finite: arbitrary paraphrases, cross-clause relationships,
 unusual Markdown and all semantic facts are NOT comprehensively validated.
 Conservative review findings are not proofs that a claim is false.
 
-Before any publication integration, build automatic trusted evidence-window
-extraction and a complete source-bound claim protocol/review design. Do not use
-the phrase scanner alone as permission to publish or as proof of all six S03
-criteria. Do not expand repository scope or inject frozen evaluation answers.
+Before publication integration, wire the host-owned binding/claim review to the
+actual accepted-read and candidate lifecycle, preserve source/cancel/budget guards,
+and implement held-candidate/independent review behavior. The new claim contract
+binds source syntax, not arbitrary prose truth. Do not use the phrase scanner or
+supported sidecars alone as permission to publish or proof of all six S03 criteria.
+Do not expand repository scope or inject frozen evaluation answers.
 
 The original S03 body and native records remain untouched at source-assisted
 5/6. Final regression replay flags block 3's registration assertion and block
