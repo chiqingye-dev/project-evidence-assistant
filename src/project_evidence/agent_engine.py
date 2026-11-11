@@ -133,9 +133,11 @@ def _json(value: Any) -> str:
 
 class _Runner:
     def __init__(self, adapter: ModelAdapter, tools: ToolExecutor, guard: Callable[[], None],
-                 cancelled: Callable[[], bool], limits: AgentBudget, recorder: EventRecorder | None) -> None:
+                 cancelled: Callable[[], bool], limits: AgentBudget, recorder: EventRecorder | None,
+                 host_context=None) -> None:
         self.adapter, self.tools, self.guard, self.cancelled = adapter, tools, guard, cancelled
         self.limits, self.recorder = limits, recorder
+        self.host_context=host_context
         self.started = time.monotonic()
         self.counters = RunCounters()
         self.events: list[dict[str, Any]] = []
@@ -218,15 +220,29 @@ class _Runner:
 
     def _context(self, initial: ModelContext) -> ModelContext:
         try:
+            history=self.history
+            if self.host_context is not None:
+                if initial.goal!=SECTION_GOAL:raise _Stop('failed')
+                data=self.host_context([ref.model_dump() for ref in self.evidence.values()])
+                self._checkpoint()
+                if data is not None:
+                    if type(data) is not dict:raise _Stop('failed')
+                    history=[*history,data]
             context = ModelContext(
                 commit=initial.commit, public_url=initial.public_url, goal=initial.goal,
-                observations=self.observations, history=self.history, remaining=self._remaining(),
+                observations=self.observations, history=history, remaining=self._remaining(),
                 anchor=initial.anchor,
             )
         except ValidationError:
             # Observations and history have already passed their individual
             # contracts; exceeding the aggregate cap is a budget failure.
             raise _Stop("budget_exhausted") from None
+        except SourceError as error:
+            self._checkpoint()
+            raise _Stop('budget_exhausted' if error.code=='budget_exhausted' else 'failed') from None
+        except (ValueError,TypeError,KeyError):
+            self._checkpoint()
+            raise _Stop('budget_exhausted') from None
         length = len(_json(context.model_dump()))
         self.counters.context_chars = max(self.counters.context_chars, length)
         if length > self.limits.max_context_chars:
@@ -722,10 +738,11 @@ def run_agent(
     cancelled: Callable[[], bool], limits: AgentBudget | None = None,
     record_event: EventRecorder | None = None,
     initial_context: ModelContext | dict[str, Any] | None = None,
+    *, host_context=None,
 ) -> RunResult:
     """Run one task; callbacks receive safe events with current counter snapshots."""
     budget = AgentBudget.model_validate(limits) if limits is not None else AgentBudget()
     if getattr(adapter, 'followup_protocol', None) == 'two_phase' and (
             budget.max_turns > 6 or budget.max_tool_calls > 12 or budget.max_seconds > 30 or budget.max_output_tokens > 4000):
         raise ValueError('Cannot expand original two-phase limits')
-    return _Runner(adapter, tools, guard, cancelled, budget, record_event).execute(initial_context)
+    return _Runner(adapter, tools, guard, cancelled, budget, record_event,host_context).execute(initial_context)

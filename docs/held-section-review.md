@@ -1,9 +1,10 @@
 # Opt-in held section candidates
 
-This candidate integrates host-owned accepted-read collection and an atomic
-hold in the actual TaskService. It does not implement semantic approval,
-release, live model projection or a model-generated assertion sidecar. No new
-paid entry is authorized by this change. Default runtime is unchanged.
+This component integrates host-owned accepted-read collection and an atomic
+hold in the actual TaskService. The newer optional host review/release and live
+model projection are described in independent-section-publication.md. A hold
+alone still never approves semantics or publication. No new paid entry is
+authorized by these components. Default runtime is unchanged.
 
 The host may provide a frozen `ReviewPolicy` through the Python `create_app` or
 TaskService constructor. HTTP/model selection cannot set it. Policy binds the
@@ -53,6 +54,6 @@ implementation or source range is acquired.
 The native-section and two existing follow-up manifests include the changed
 host/storage path and all call-evidence modules. Drift in these inputs must stop
 before request/reservation. Original tracked CRLF files retain their line endings.
-Next integrate bounded model-facing call data and a complete independent review
-and release contract. Do not use an empty audit as publication approval or
-deserialize a saved index as fresh authorization.
+The independent review contract now supplies that separate optional host path.
+Do not use an empty audit as publication approval or deserialize a saved index
+as fresh authorization; see the newer document for trust and lifecycle limits.

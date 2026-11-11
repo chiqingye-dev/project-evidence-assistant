@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-10-14",
+  "split": "development; never unseen held-out",
+  "actual_submission_model_runs_at_freeze": 0,
+  "commit": "058f36c771f15735a1e987a21c55074b80f511a9",
+  "public_url": "https://github.com/chiye0384-dot/ForgeOJ",
+  "sources": [
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionController.java",
+      "start_line": 1,
+      "end_line": 43,
+      "sha256": "5bd3cae08772874c7de4f21b5946695dc00aa063ea91e8e1806128598dce478e",
+      "blob_oid": "7872cebf43185858fa6c6105f2a9e7a5240d3a85",
+      "evidence_id": "3efed37b-4989-4e44-8d03-9712832071e1",
+      "artifact": "evidence/m2-submission-controller.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java",
+      "start_line": 1,
+      "end_line": 80,
+      "sha256": "c64ba937a1f2e1db01895618b12a189b51cb6fe49713c4a1195f2021a9498430",
+      "blob_oid": "5290249c9efdaf58585cdec9407641eccd822676",
+      "evidence_id": "b2685cac-357d-4ba3-a07f-a9366385d72d",
+      "artifact": "evidence/m22-submission-service-01.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java",
+      "start_line": 81,
+      "end_line": 160,
+      "sha256": "c64ba937a1f2e1db01895618b12a189b51cb6fe49713c4a1195f2021a9498430",
+      "blob_oid": "5290249c9efdaf58585cdec9407641eccd822676",
+      "evidence_id": "457ad174-a03a-4e8e-8c74-c4fbbda76e48",
+      "artifact": "evidence/m22-service-81.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java",
+      "start_line": 161,
+      "end_line": 221,
+      "sha256": "c64ba937a1f2e1db01895618b12a189b51cb6fe49713c4a1195f2021a9498430",
+      "blob_oid": "5290249c9efdaf58585cdec9407641eccd822676",
+      "evidence_id": "7f9a0046-b064-4715-8dfd-106a9cbcce5c",
+      "artifact": "evidence/m22-service-161.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionTransactionService.java",
+      "start_line": 1,
+      "end_line": 80,
+      "sha256": "4f9bb7dc5acc1005b24768f9c804c98a21ec67824d29521c745ee8833b361500",
+      "blob_oid": "429dbf60da825314c36efb33f63a59386bbf7ffd",
+      "evidence_id": "91893e97-72db-4acb-a9aa-57e189a5d418",
+      "artifact": "evidence/m22-transaction-01.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionTransactionService.java",
+      "start_line": 81,
+      "end_line": 105,
+      "sha256": "4f9bb7dc5acc1005b24768f9c804c98a21ec67824d29521c745ee8833b361500",
+      "blob_oid": "429dbf60da825314c36efb33f63a59386bbf7ffd",
+      "evidence_id": "9f0de2ed-b35d-4555-a8ad-197f22c8814e",
+      "artifact": "evidence/m22-transaction-02.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionMapper.java",
+      "start_line": 1,
+      "end_line": 80,
+      "sha256": "4c6023aa388b0b1e918edf6aa6ad5cdb26f8f026988420f12a185d65a3f7ef82",
+      "blob_oid": "13b05b895434efe54fa521d761f1bafa1c1a5601",
+      "evidence_id": "6062dd4c-b165-442a-a640-10bff9d15aa7",
+      "artifact": "evidence/m22-submission-mapper-01.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionMapper.java",
+      "start_line": 81,
+      "end_line": 160,
+      "sha256": "4c6023aa388b0b1e918edf6aa6ad5cdb26f8f026988420f12a185d65a3f7ef82",
+      "blob_oid": "13b05b895434efe54fa521d761f1bafa1c1a5601",
+      "evidence_id": "f1126b33-9302-4749-85ac-46652f971622",
+      "artifact": "evidence/m22-mapper-81.json"
+    },
+    {
+      "path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionMapper.java",
+      "start_line": 161,
+      "end_line": 196,
+      "sha256": "4c6023aa388b0b1e918edf6aa6ad5cdb26f8f026988420f12a185d65a3f7ef82",
+      "blob_oid": "13b05b895434efe54fa521d761f1bafa1c1a5601",
+      "evidence_id": "83e07f45-1c0e-4a04-b82a-49a543cd6278",
+      "artifact": "evidence/m22-mapper-161.json"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "M2-S01",
+      "goal": "chapter_outline",
+      "request": "从后端目录打开提交主题，生成可定位的章结构，先不写整章正文。",
+      "required": [
+        "提交章包含入口/参数身份、校验/幂等、事务写入/响应三个阅读方面；小节能定位获准代码。",
+        "POST /api/v1/problems/{slug}/submissions，身份来自AuthenticationPrincipal而非客户端userId；accepted为声明。",
+        "目录线索不当事实，回调/注解不当已运行幂等/原子事务/消息或判题证明；保留未读实现。"
+      ]
+    },
+    {
+      "id": "M2-S02",
+      "goal": "section_explanation",
+      "request": "选择入口/参数或校验小节，说明身份、输入、校验先后、幂等线索和响应。",
+      "required": [
+        "组合POST完整URL，Idempotency-Key请求头、language/sourceCode正文、principal.userId进入回调create；未读coalescer不虚构并发机制。",
+        "Service先解析UUID、验证language/source、查活跃账号，再查旧幂等结果；命中可返回旧结果，DuplicateKeyException后再查同用户/请求结果。",
+        "只接受JAVA_21；source校验非空/非blank、无NUL、UTF-8字节最多65536，并对codeOnly做package/public Main匹配；不把字节数说成字符数，不凭静态正则说编译或安全运行已成功。",
+        "UUID校验包括canonical spelling的equalsIgnoreCase比较；未读全方法则明确相应缺口，不编造跳过校验或同键payload比对。",
+        "202 accepted表示入口声明接受请求，不等于判题完成；每段事实依据来自本任务读到且支持对应内容的文件。"
+      ]
+    },
+    {
+      "id": "M2-S03",
+      "goal": "section_explanation",
+      "request": "选择事务写入小节，说明配额/幂等复查、冻结版本、三类写入及响应边界。",
+      "required": [
+        "createNew带@Transactional，调用requireCurrentWrite、lockQuota并复查active、旧幂等；缺quota行抛IllegalStateException，>=3抛TOO_MANY_REQUESTS，题目版本缺失NOT_FOUND。注解不证明运行事务生效。",
+        "Mapper lockQuota声明user_judge_quota_lock按userId FOR UPDATE；队列数是submission QUEUED/RETRYING加content_validation_job QUEUED加self_test_job QUEUED，不只数submission。",
+        "公开ACTIVE题目slug筛选取得current judge version及资源/镜像/数据集快照；不要说请求输入自己决定冻结版本。",
+        "enqueue按顺序insertSubmission、insertJudgeTask、insertOutboxEvent；insert SQL保存初始QUEUED/NULL verdict/statusVersion0，outbox事件为JUDGE_TASK_QUEUED、契约1。",
+        "taskPayload包含taskId、submissionId、JUDGE_SUBMISSION、contractVersion1，返回SubmissionResult(提交id,QUEUED,0)。outbox插入不等于MQ已经发布/消费或判题完成。",
+        "跨文件事实分别引用实际声明/调用；未知account/coalescer/限流/afterCommit实现及数据库运行保证保留缺口。"
+      ]
+    }
+  ],
+  "success_rule": "All required checks and selected topic/section/schema/actual-task citation checks pass; zero critical fabrication. Preserve failures; Codex source-assisted review is not personal acceptance.",
+  "reporting": "Three independent submission development tasks, repetitions do not increase denominator; engineering/scripted tests are not model results. Scope is initial submission chapter and entry/validation/transaction sections, not all V1."
+}

@@ -20,16 +20,29 @@ from .storage import ProjectStore
 from .task_storage import ACTIVE, MAX_TASK_RECORDS, TaskStore
 from .task_diagnostics import engine_metadata
 from .section_review import ReviewPolicy, AcceptedReads, HeldReviewStore
+from .section_semantic_review import ReviewContract,HostReviewer,ReviewStore,assess
 
 
 class TaskService:
-    def __init__(self, projects: ProjectStore, sources: SourceService, adapter=None, *, section_review_policy=None) -> None:
+    def __init__(self, projects: ProjectStore, sources: SourceService, adapter=None, *, section_review_policy=None, review_contract=None) -> None:
         self.projects, self.sources = projects, sources
         self.history = TaskStore(projects)
         if section_review_policy is not None and type(section_review_policy) is not ReviewPolicy:
             raise ValueError('section_review_policy')
         self.section_review_policy=section_review_policy
         self.held_reviews=HeldReviewStore(projects,create=section_review_policy is not None)
+        if review_contract is not None and (type(review_contract) is not ReviewContract or section_review_policy is None):
+            raise ValueError('review_contract')
+        if review_contract is not None:
+            from .source_policy import normalize_github_repository
+            if (review_contract.commit!=section_review_policy.commit or
+                    normalize_github_repository(review_contract.public_url)!=normalize_github_repository(section_review_policy.public_url)):
+                raise ValueError('review_contract')
+        self.review_contract=review_contract
+        self.independent_reviews=ReviewStore(projects,create=review_contract is not None,contract=review_contract)
+        self._held_live={}
+        self._review_inflight=set()
+        self._review_clock=time.monotonic
         self.learning = LearningStore(projects)
         self.adapter = adapter if adapter is not None else UnconfiguredAdapter()
         self.limits = AgentBudget()
@@ -44,6 +57,8 @@ class TaskService:
                    source_verified=self.sources.active(record))
         held=self.held_reviews.summary(record.id,task['id'])
         if held is not None:value['candidate_review']=held
+        reviewed=self.independent_reviews.summary(record.id,task['id'])
+        if reviewed is not None:value['independent_review']=reviewed
         return value
 
     def list(self, record, *, limit=100, offset=0) -> list[dict]:
@@ -57,6 +72,8 @@ class TaskService:
     def project_change(self, project_id):
         """Serialize version/delete with start and final publication."""
         with self._lock:
+            for task_id,item in list(self._held_live.items()):
+                if str(item[1].view()['project_id'])==str(project_id):self._held_live.pop(task_id,None)
             if str(project_id) == self._active_project:
                 self._cancel.set()
             self.history.stop_project(project_id, "source_changed", "选定来源变化，任务停止；旧记录保留。")
@@ -72,12 +89,16 @@ class TaskService:
                     self._cancel.set()
                 self.history.update(record.id, task_id, status="cancelled",
                                     message="已取消；在途调用返回前不会启动下一步，已保存证据仍保留。")
+            elif task['status']=='needs_review':
+                self.independent_reviews.cancel(self.history,record.id,task_id)
+                self._held_live.pop(str(task_id),None)
             return self.get(record, task_id)
 
     def shutdown(self) -> None:
         # No broad process termination. Adapter/tool in-flight limits are cooperative.
         with self._lock:
             self._cancel.set()
+            self._held_live.clear()
             if self._active_project:
                 self.history.stop_project(self._active_project, "interrupted", "后台停止，任务中断；不会自动重试。")
 
@@ -161,6 +182,8 @@ class TaskService:
                 return {"status": "model_not_configured", "message": "模型尚未配置，未启动调用，也未生成学习目录。当前没有模型费用。"}
             if self._thread is not None and self._thread.is_alive():
                 return {"status": "task_busy", "message": "已有任务或取消后的在途调用；请等待它结束再开始。"}
+            if kind==SECTION_GOAL and self.section_review_policy is not None and len(self._held_live)>=8:
+                return {'status':'review_capacity','message':'本机待审候选已达上限；请先复核或取消，不会启动新模型任务。'}
             goal = GOAL if kind == "directory" else kind
             if goal not in {GOAL, OUTLINE_GOAL, SECTION_GOAL, FOLLOW_UP_GOAL}:
                 raise ValueError("invalid_task_kind")
@@ -263,7 +286,7 @@ class TaskService:
                 self.history.update(record.id, task_id, event={"kind": "transport_selected",
                     "message": "追问传输：" + protocol + ("；规划格式：" + adapter.followup_claim_format if getattr(adapter, "followup_claim_format", "literal") in ("selected_parts_v1", "selected_table_v1") else "") + ("；正文格式：" + adapter.followup_prose_format if getattr(adapter, "followup_prose_format", "indexed") in ("kind_prose_v1", "flat_prose_v1") else "") + ("；位置视图：" + adapter.followup_scope_view if getattr(adapter, "followup_scope_view", "off") in ("java_scope_edge_view_v1", "java_scope_edge_unit_columns_v1", "java_scope_edge_unit_index_columns_v1") else "") + "；只接受固定动作载体，仍执行原引用校验。"})
             outcome = run_agent(adapter, execute, guard, cancelled, self.limits,
-                                record_event, context)
+                                record_event, context,host_context=collector.model_context if collector is not None else None)
             payload = outcome.model_dump(mode="json")
             self.history.record_counters(record.id, task_id, payload["counters"], payload.get("evidence", []))
             status = {"clarify": "needs_clarification", "not_configured": "failed"}.get(payload["status"], payload["status"])
@@ -280,12 +303,13 @@ class TaskService:
                                 raise SourceError('timeout','冻结复核超过任务时间上限。')
                             status='needs_review'
                             payload['message']='正文候选已冻结待源码复核；未发布学习正文，不能将句法检查当成语义通过。'
-                        self.history.update(record.id, task_id, status=status, message=payload["message"],
+                        stored=self.history.update(record.id, task_id, status=status, message=payload["message"],
                                             counters=payload["counters"], result=payload.get("final_output"),
                                             evidence=payload.get("evidence", []),
                                             publish=(lambda connection: self.learning.save_from_task(record.id, task_id, transaction=connection))
                                             if status == "completed" and context.goal != GOAL else None,
                                             hold=(lambda connection:self.held_reviews.save(connection,held)) if held is not None else None)
+                        if stored and held is not None:self._held_live[task_id]=(collector,held,identity)
         except SourceError as error:
             with self._lock:
                 status = error.code if error.code in {"source_changed", "unverified", "denied", "budget_exhausted", "timeout"} else "failed"
@@ -299,3 +323,49 @@ class TaskService:
             with self._lock:
                 if self._active_task == task_id:
                     self._active_project = self._active_task = None
+
+    def review_held(self,record,task_id,reviewer):
+        """Host Python operation only: never exposed to HTTP/model tools.
+
+        Source-assisted reviewer judgement is explicit, not automated semantic
+        proof. Disk views alone cannot recreate a live review authorization.
+        """
+        task_id=str(task_id);started=self._review_clock()
+        with self._lock:
+            if self.review_contract is None or type(reviewer) is not HostReviewer:
+                raise ValueError('review_not_configured')
+            live=self._held_live.get(task_id)
+            if live is None or task_id in self._review_inflight:raise ValueError('review_not_live')
+            collector,candidate,identity=live
+            def guard_review():
+                latest=self.projects.get(record.id);task=self.history.get(record.id,task_id)
+                if (latest is None or latest.commit!=record.commit or self._held_live.get(task_id) is not live
+                        or task is None or task['status']!='needs_review'
+                        or str(record.id)!=candidate.view()['project_id']):
+                    raise SourceError('source_changed','待审候选或选定版本已经变化。')
+                self.sources.require_session(latest,identity)
+                return task
+            task=guard_review()
+            self.independent_reviews.require_capacity(record.id,task_id)
+            self._review_inflight.add(task_id)
+        phase='review'
+        try:
+            checked=assess(candidate,collector,self.review_contract,reviewer,task['execution_mode'])
+            with self._lock:
+                guard_review()
+                if self._review_clock()-started>=30:raise SourceError('timeout','独立复核超过本轮时限。')
+                with self.sources.checked_session(record,identity):
+                    phase='publication'
+                    receipt=self.independent_reviews.finish(self.history,self.learning,candidate,checked)
+                    self._held_live.pop(task_id,None)
+            return receipt
+        except Exception as error:
+            reason=('review_timeout' if isinstance(error,SourceError) and error.code=='timeout' else
+                    'review_state_changed' if isinstance(error,SourceError) else
+                    'publication_failed' if phase=='publication' else 'invalid_review')
+            # Fixed bounded diagnostics only, never callback/SQL exception text.
+            try:self.independent_reviews.error(record.id,task_id,candidate,reason)
+            except Exception:pass
+            raise ValueError(reason) from None
+        finally:
+            with self._lock:self._review_inflight.discard(task_id)
