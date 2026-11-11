@@ -13,8 +13,10 @@ mismatch stops before section task creation. All original source-session,
 permission, model-purpose, budget, cancellation and persistence guards remain.
 
 For enabled section tasks, read_excerpt is executed with the existing SourceTools
-against the current verified source. A temporary host proxy captures only those
-already-read bytes; it adds no source requests, paths or model-visible lines.
+against the current verified source. A temporary verified-read observer captures
+only those already-read bytes; it adds no source requests, paths or model-visible
+lines. It runs through the original tool instance, preserving ranged subclasses,
+their masked searches and custom digest checks, and restores earlier observers.
 Existing secret/encoding/size filters still run. SHA256 and Git blob identity
 must match the fixed policy before feedback returns. Other tools are unchanged.
 The collector matches actual committed saved feedback and only accepts reads

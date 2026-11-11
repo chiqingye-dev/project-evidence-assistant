@@ -8,6 +8,14 @@ whole context under the original 24k cap before model dispatch/reservation;
 based receiver inference, answer injection or larger model/output budget exists.
 The native function/output schema remains unchanged. Call data is not authority.
 
+The collector observes the existing SourceTools instance after the base byte
+checks instead of replacing it with a plain tool. RangedSourceTools and sealed
+S03 subclasses retain their original range masks/digest overrides. Hooks are
+chained/restored and cannot mint a blob if a subclass bypasses the verified base
+read. No additional read or output field is introduced. The initial exact-base-
+class restriction was found during entry integration and corrected before Key
+input or paid calls; dedicated observer/range regression evidence is retained.
+
 All generated section candidates remain frozen needs_review. The host can also
 configure a ReviewContract and call TaskService.review_held with a HostReviewer
 inside the same process. No HTTP/model tool can select a reviewer, submit review

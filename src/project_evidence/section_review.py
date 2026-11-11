@@ -48,17 +48,6 @@ class ReviewPolicy:
         return scope
 
 
-class _Tap:
-    def __init__(self,source,captured):self._source,self._captured=source,captured
-    def __getattr__(self,name):return getattr(self._source,name)
-    def read_bytes(self,path):
-        raw=self._source.read_bytes(path)
-        if type(raw) is not bytes or len(raw)>MAX_FILE_BYTES:
-            raise SourceError('budget_exhausted','来源内容超过复核上限。')
-        self._captured[path]=raw
-        return raw
-
-
 class AcceptedReads:
     """One current task; raw tool returns alone never become accepted evidence."""
     def __init__(self,scope):
@@ -71,10 +60,14 @@ class AcceptedReads:
 
     def read(self,tools,arguments):
         self._open()
-        if type(tools) is not SourceTools or not read_is_permitted(self.ranges,arguments):
+        if not isinstance(tools,SourceTools) or not read_is_permitted(self.ranges,arguments):
             raise SourceError('denied','读取不在宿主允许的复核范围。')
         captured={}
-        result=SourceTools(_Tap(tools.source,captured)).read_excerpt(**arguments)
+        def observe(path,raw):
+            if type(raw) is not bytes or len(raw)>MAX_FILE_BYTES:
+                raise SourceError('budget_exhausted','来源内容超过复核上限。')
+            captured[path]=raw
+        with tools.observe_verified_reads(observe):result=tools.read_excerpt(**arguments)
         if result.get('status')=='ok' and result.get('text'):
             path=result['path'];raw=captured.get(path)
             if raw is None or sha256(raw).hexdigest()!=result['sha256']:

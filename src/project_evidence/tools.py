@@ -1,6 +1,7 @@
 """Bounded tools over a verified public Git snapshot; source text is data."""
 
 from fnmatch import fnmatchcase
+from contextlib import contextmanager
 import hashlib
 import json
 import re
@@ -127,6 +128,22 @@ class SourceTools:
         self._entry_cache: list[dict[str, Any]] | None = None
         self._state_cache: dict[str, Any] | None = None
         self._state_checked_at = 0.0
+        self._verified_read_observer = None
+
+    @contextmanager
+    def observe_verified_reads(self, observer):
+        """Host-only observation; preserve subclass guards and previous hooks.
+
+        No new reads, returned fields or permissions. Only bytes which passed
+        the existing size/encoding/secret boundary reach the callback.
+        """
+        previous=self._verified_read_observer
+        def observe(path,raw):
+            if previous is not None:previous(path,raw)
+            observer(path,raw)
+        self._verified_read_observer=observe
+        try:yield
+        finally:self._verified_read_observer=previous
 
     def _base(self, status: str = "ok") -> dict[str, Any]:
         return {
@@ -213,6 +230,7 @@ class SourceTools:
         if contains_sensitive_content(text):
             raise SourceError("secret_detected", "secret_detected")
         self._check_time(deadline)
+        if self._verified_read_observer is not None:self._verified_read_observer(entry['path'],raw)
         return text, _lines(text), hashlib.sha256(raw).hexdigest()
 
     def find_files(self, pattern: str = "*.java", limit: int = 100) -> dict[str, Any]:

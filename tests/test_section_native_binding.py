@@ -36,6 +36,7 @@ def test_native_seal_and_both_original_followup_seals():
     'src/project_evidence/call_claim_contract.py','src/project_evidence/call_evidence.py',
     'src/project_evidence/section_semantic_review.py','src/project_evidence/review_contracts.py',
     'schemas/submission-review-golden.json','src/project_evidence/learning_store.py','src/project_evidence/source_service.py',
+    'src/project_evidence/tools.py',
 ])
 def test_input_drift_blocks_opt_in_construction_before_any_request(tmp_path,monkeypatch,name):
     copy_inputs(tmp_path/'sealed',monkeypatch)
