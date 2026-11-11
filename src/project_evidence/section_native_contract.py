@@ -77,14 +77,36 @@ def _parameters(model, omit=()):
     return _inline(schema)
 
 
-def functions(context, ranges):
+COMPACT_PROFILE = 'compact_v1'
+MIN_SECTION_TOKENS = 2400
+
+
+def _output_profile(profile, tokens):
+    if profile not in ('off', COMPACT_PROFILE): raise Rejected('schema')
+    if profile == 'off': return False
+    if type(tokens) is not int or not 1 <= tokens <= 4000: raise Rejected('budget')
+    return True
+
+
+def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     context = _context(context); ranges = _ranges(ranges)
+    tokens = min(context.remaining.output_tokens, 4000) if max_output_tokens is None else max_output_tokens
+    compact = _output_profile(output_profile, tokens)
     reading = ReadArguments.model_json_schema()
     reading['required'] = ['path', 'start_line', 'end_line']
     reading['properties']['path'] = {'type':'string', 'enum':list(ranges)}
     reading['oneOf'] = read_ranges_schema(ranges)['oneOf']
     section = _parameters(SectionExplanation, ('kind', 'topic', 'section_id'))
     section['properties']['title']['const'] = context.anchor.section_title
+    if compact:
+        blocks = section['properties']['blocks']
+        blocks['maxItems'] = 6
+        block = blocks['items']['properties']
+        block['heading']['maxLength'] = 48
+        block['text']['maxLength'] = 320
+        block['evidence_ids']['maxItems'] = 3
+        section['properties']['gaps']['maxItems'] = 3
+        section['properties']['gaps']['items']['maxLength'] = 100
     parameters = {
         'find_files': _parameters(FindArguments),
         'search_text': _parameters(SearchArguments),
@@ -101,8 +123,13 @@ def functions(context, ranges):
         'report_gap':'Finish with missing evidence; do not fabricate a section.',
         'request_clarification':'Finish with a bounded clarification request.',
     }
+    names = (*SOURCE_NAMES, *FINAL_NAMES)
+    if compact and tokens < MIN_SECTION_TOKENS:
+        # No new reads or potentially incomplete section when the remaining
+        # shared allowance is small. This is not an exact tokenizer guarantee.
+        names = ('report_gap', 'request_clarification')
     return [dict(type='function', function=dict(name=name, strict=False,
-        description=descriptions[name], parameters=parameters[name])) for name in (*SOURCE_NAMES, *FINAL_NAMES)]
+        description=descriptions[name], parameters=parameters[name])) for name in names]
 
 
 def load_guidance(base=None):
@@ -134,16 +161,25 @@ def build_request(context, ranges, *, max_output_tokens=4000):
     return request_body(context, ranges, guidance, max_output_tokens=max_output_tokens)
 
 
-def request_body(context, ranges, guidance, *, max_output_tokens):
+def request_body(context, ranges, guidance, *, max_output_tokens, output_profile='off'):
     """Use the task's already-frozen host guidance, not a mid-task reload."""
     context = _context(context)
     if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 4000:
         raise Rejected('budget')
     if not isinstance(guidance,str) or not guidance or len(guidance.encode())>12000:
         raise Rejected('guidance')
+    compact = _output_profile(output_profile, max_output_tokens)
+    if compact:
+        max_output_tokens = min(max_output_tokens, context.remaining.output_tokens)
+        _output_profile(output_profile, max_output_tokens)
+        guidance += ('\n本轮compact_v1容量约束优先于建议块数：最多6块，每块text最多320字符、heading最多48字符、'
+            '引用最多3项；gaps最多3项且每项100字符。优先保留本节必需事实及真实引用；'
+            '场景、图、问答和练习只在余量充足时简述，不重复正文或缺口。不能为压短删去必需事实、'
+            '未知边界或正确引用；无法完整说明就report_gap。字符限制不是精确token保证。'
+            f'本轮共享输出剩余最多{max_output_tokens} token；低于{MIN_SECTION_TOKENS}时仅可报告缺口或澄清。')
     return dict(model='deepseek-flash', stream=False, temperature=0,
         thinking=dict(type='disabled'), max_tokens=max_output_tokens, tool_choice='required',
-        tools=functions(context, ranges), messages=[
+        tools=functions(context, ranges, output_profile=output_profile, max_output_tokens=max_output_tokens), messages=[
             dict(role='system', content=context.system_instruction+guidance),
             dict(role='user', content=json.dumps(context.model_dump(), ensure_ascii=False))])
 
@@ -164,7 +200,7 @@ def _arguments(text):
     return value
 
 
-def decode(envelope, context, ranges, usage):
+def decode(envelope, context, ranges, usage, *, output_profile='off', max_output_tokens=None):
     """Decode the declared protocol once; never repair, unwrap or execute calls."""
     context = _context(context); ranges = _ranges(ranges)
     try: usage=Usage.model_validate(usage)
@@ -182,7 +218,8 @@ def decode(envelope, context, ranges, usage):
         raise Rejected('envelope')
     calls=message.get('tool_calls')
     if not isinstance(calls, list) or not 1 <= len(calls) <= 3: raise Rejected('call_count')
-    definitions={f['function']['name']:f['function']['parameters'] for f in functions(context, ranges)}
+    definitions={f['function']['name']:f['function']['parameters'] for f in functions(
+        context, ranges, output_profile=output_profile, max_output_tokens=max_output_tokens)}
     decoded=[];ids=set()
     for call in calls:
         if (not isinstance(call, dict) or call.get('type')!='function' or not isinstance(call.get('id'), str)
@@ -211,6 +248,16 @@ def decode(envelope, context, ranges, usage):
         for _,name,args in decoded:
             if name=='read_excerpt' and not read_is_permitted(ranges,args): raise Rejected('read_outside_range')
         action=dict(kind='tools',tool_calls=[dict(id=identifier,name=name,arguments=args) for identifier,name,args in decoded])
-    try: return ModelTurn.model_validate(dict(action,usage=usage.model_dump()))
+    try: result = ModelTurn.model_validate(dict(action,usage=usage.model_dump()))
     except ValidationError as error:
         raise Rejected('native_action_invalid',diagnostics=schema_diagnostics(error)) from None
+    if output_profile == COMPACT_PROFILE and final and final[0][1] == 'publish_section':
+        # strict=False upstream remains advisory: check the same narrowed
+        # profile locally, after the original contract. Never trim or repair.
+        output = result.final_output
+        if (len(output.blocks) > 6 or len(output.gaps) > 3
+                or any(len(gap) > 100 for gap in output.gaps)
+                or any(len(b.heading) > 48 or len(b.text) > 320 or len(b.evidence_ids) > 3
+                       for b in output.blocks)):
+            raise Rejected('arguments_shape')
+    return result

@@ -1,5 +1,5 @@
 {
-  "src/project_evidence/deepseek_adapter.py": "07a5c45683a6ef30e343a0669ecce49e0a7ea1b74f7092f02e1235143bd21e34",
+  "src/project_evidence/deepseek_adapter.py": "f6e91dd3427a88e32933413b4849625e307ac2028dc2ddddc543b37f121c9101",
   "src/project_evidence/agent_engine.py": "bdcf470a295f2fa35bd2bdbcc195e6179a9d171ecac5e898e11f98c997fd20d9",
   "src/project_evidence/task_service.py": "9f79955989117ea4218c6121e868251214b3b1bd2f9275c734f30db5f9bdb142",
   "src/project_evidence/app.py": "eca062dc714dd8bc13b6c23317ac6b19ba6c202b5c22bbd63dddba59be5e5d32",
@@ -12,8 +12,8 @@
   "src/project_evidence/__init__.py": "7d9e3f66185a97ef0ef98f54c9d0ad735e13451c1306463afba4e644df9817a6",
   "src/project_evidence/agent_protocol.py": "2374160e1f070b3c0fc5f7233ed72f230b96365c1e6eb8a5e46fb06e1907924c",
   "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b",
-  "src/project_evidence/section_native_contract.py": "0fe2eec1f2c3254d6d73cb2b4cdfa9853751c4c96d2103d8b50d9978418fc669",
-  "src/project_evidence/section_native_binding.py": "2302c10264ebae820e2bd57dc2b655c7b82bfe6136f8bbd7fbd88e93e29d9a89",
+  "src/project_evidence/section_native_contract.py": "8aac1e968c8d84f1c18fa34710fdfc8d767d8d6a33fdbe51a1696ba689048093",
+  "src/project_evidence/section_native_binding.py": "b3e6aa2d5f5d6b6e6af5cbac859b0afedc69fe8284bf32059bc3d1cd71ea593f",
   "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
   "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c",
   "src/project_evidence/task_storage.py": "bcf4cfa2cc5b4af6214195142c7e01e292490763acda0e43a0f37bcc1b6fbea1",

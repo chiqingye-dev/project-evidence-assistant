@@ -229,7 +229,7 @@ class DeepSeekAdapter:
     def __init__(self, api_key: str, ledger: SpendingLedger, grant_id: str, *, transport=None,
                  task_id: str | None = None, enable_query: bool = False, enable_submission: bool = False,
                  enable_consumption: bool = False, enable_judging: bool = False, enable_followup: bool = False,
-                 goal=GOAL, topic="query", followup_protocol="responses", proxy_port=0, followup_claim_format="literal", followup_prose_format="indexed", followup_scope_view="off",section_read_ranges=None,section_protocol="json_object"):
+                 goal=GOAL, topic="query", followup_protocol="responses", proxy_port=0, followup_claim_format="literal", followup_prose_format="indexed", followup_scope_view="off",section_read_ranges=None,section_protocol="json_object",section_output_profile="off"):
         self._proxy_port = checked_proxy_port(proxy_port)
         if not isinstance(api_key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,200}", api_key):
             raise ValueError("在本机配置有效API密钥；不要在聊天、URL或日志中填写。")
@@ -241,6 +241,10 @@ class DeepSeekAdapter:
                 or enable_judging or enable_followup or goal!=SECTION_GOAL or topic!='submission'):
             raise ValueError('Function section transport requires an isolated submission section adapter.')
         self.section_protocol=section_protocol
+        if (type(section_output_profile) is not str or section_output_profile not in {'off','compact_v1'}
+                or (section_output_profile != 'off' and section_protocol != 'named_functions')):
+            raise ValueError('Compact output requires explicit named section functions.')
+        self.section_output_profile=section_output_profile
         if section_protocol=='named_functions' and not self._section_read_ranges:
             raise ValueError('Named section functions require explicit read ranges.')
         if section_protocol=='named_functions':
@@ -289,7 +293,7 @@ class DeepSeekAdapter:
                                goal=goal, topic=topic, followup_protocol=self.followup_protocol, proxy_port=self._proxy_port,
                                followup_claim_format=self.followup_claim_format, followup_prose_format=self.followup_prose_format,
                                followup_scope_view=self.followup_scope_view,section_read_ranges=self._section_read_ranges,
-                               section_protocol=self.section_protocol)
+                               section_protocol=self.section_protocol,section_output_profile=self.section_output_profile)
 
     @property
     def network_route(self):
@@ -345,7 +349,7 @@ class DeepSeekAdapter:
         if context.goal==SECTION_GOAL and self.section_protocol=='named_functions':
             try:
                 return section_native_contract.request_body(context,self._section_read_ranges,self._guidance,
-                    max_output_tokens=4000)['messages']
+                    max_output_tokens=4000,output_profile=self.section_output_profile)['messages']
             except section_native_contract.Rejected:
                 raise ModelError('invalid_response',request_sent=False) from None
         contract = self._contract(context)
@@ -389,7 +393,8 @@ class DeepSeekAdapter:
         if named_section:
             try:
                 request=section_native_contract.request_body(context,self._section_read_ranges,self._guidance,
-                    max_output_tokens=max_output_tokens)
+                    max_output_tokens=max_output_tokens,output_profile=self.section_output_profile)
+                max_output_tokens=request['max_tokens']
             except section_native_contract.Rejected as error:
                 raise ModelError('output_limit' if error.reason=='budget' else 'invalid_response',request_sent=False) from None
         elif section_carrier:
@@ -567,7 +572,8 @@ class DeepSeekAdapter:
                 raise ModelError("timeout", usage=usage)
             if section_context is not None:
                 try:
-                    return section_native_contract.decode(envelope,section_context,self._section_read_ranges,usage)
+                    return section_native_contract.decode(envelope,section_context,self._section_read_ranges,usage,
+                        output_profile=self.section_output_profile,max_output_tokens=max_output_tokens)
                 except section_native_contract.Rejected as error:
                     raise ModelError('output_limit' if error.reason=='output_limit' else 'invalid_response',usage=usage,
                         diagnostics=('section_native.'+error.reason,*error.diagnostics)) from None
