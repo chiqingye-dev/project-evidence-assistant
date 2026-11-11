@@ -6,7 +6,7 @@ from .agent_protocol import ModelError
 
 HERE=Path(__file__).resolve().parents[2]
 MANIFEST='schemas/section-native-bindings.json'
-EXPECTED='51d4d3832f3a11a68f8292a20f1515d568690ab71a39ed6e6ee9685afd7cf55a'
+EXPECTED='3f18fe98075b73ca2a2d53d257f34af1ce24213722cccbafe99619c658b96818'
 
 
 def verify_inputs():

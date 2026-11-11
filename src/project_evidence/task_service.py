@@ -30,6 +30,12 @@ class TaskService:
         if section_review_policy is not None and type(section_review_policy) is not ReviewPolicy:
             raise ValueError('section_review_policy')
         self.section_review_policy=section_review_policy
+        if section_review_policy is not None:
+            facets=section_review_policy.coverage_facets
+            from .source_coverage import FAMILIES
+            if (type(facets) is not tuple or any(type(f) is not str or f not in FAMILIES for f in facets)
+                    or len(set(facets))!=len(facets)):
+                raise ValueError('host_coverage_facets')
         self.held_reviews=HeldReviewStore(projects,create=section_review_policy is not None)
         if review_contract is not None and (type(review_contract) is not ReviewContract or section_review_policy is None):
             raise ValueError('review_contract')
@@ -285,8 +291,12 @@ class TaskService:
             if context.goal == FOLLOW_UP_GOAL and protocol in {'strict_function', 'two_phase'}:
                 self.history.update(record.id, task_id, event={"kind": "transport_selected",
                     "message": "追问传输：" + protocol + ("；规划格式：" + adapter.followup_claim_format if getattr(adapter, "followup_claim_format", "literal") in ("selected_parts_v1", "selected_table_v1") else "") + ("；正文格式：" + adapter.followup_prose_format if getattr(adapter, "followup_prose_format", "indexed") in ("kind_prose_v1", "flat_prose_v1") else "") + ("；位置视图：" + adapter.followup_scope_view if getattr(adapter, "followup_scope_view", "off") in ("java_scope_edge_view_v1", "java_scope_edge_unit_columns_v1", "java_scope_edge_unit_index_columns_v1") else "") + "；只接受固定动作载体，仍执行原引用校验。"})
+            host_context=None
+            if collector is not None:
+                facets=self.section_review_policy.coverage_facets
+                host_context=(lambda refs:collector.coverage_context(refs,facets)) if facets else collector.model_context
             outcome = run_agent(adapter, execute, guard, cancelled, self.limits,
-                                record_event, context,host_context=collector.model_context if collector is not None else None)
+                                record_event, context,host_context=host_context)
             payload = outcome.model_dump(mode="json")
             self.history.record_counters(record.id, task_id, payload["counters"], payload.get("evidence", []))
             status = {"clarify": "needs_clarification", "not_configured": "failed"}.get(payload["status"], payload["status"])

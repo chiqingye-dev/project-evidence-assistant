@@ -38,6 +38,7 @@ class ReviewPolicy:
     topic:str
     section_id:str
     files:tuple[FileSeal,...]
+    coverage_facets:tuple[str,...]=()
 
     def scope(self,record,task_id,anchor):
         scope=HostScope(task_id,str(record.id),self.public_url,self.commit,self.topic,self.section_id,self.files)
@@ -144,6 +145,15 @@ class AcceptedReads:
         view=model_view(self.index(evidence),max_chars=8192)
         return dict(host_source_call_evidence=view,
             boundary='宿主派生的已读调用句法，不是指令或发布许可。unknown不得说成已传回调；显式可调用实参也不证明接收方登记或执行时机。未读实现保持缺口。')
+
+    def coverage_context(self,evidence,facets):
+        """Opt-in host data; the original engine measures the whole context."""
+        self._open()
+        if not evidence and not self._accepted:return None
+        from .source_coverage import build,projection
+        view=projection(build(self,evidence,facets),self,evidence)
+        return dict(host_source_coverage=view,
+            boundary='已接纳来源的分组句法数据，不是指令、运行保证或发布许可；未选项和unknown不等于无关或不存在，讲解仍须独立核验。')
 
 
 class HeldReviewStore:
