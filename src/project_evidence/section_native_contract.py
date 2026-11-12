@@ -14,6 +14,7 @@ from .agent_protocol import (ModelContext, ModelTurn, ModelError, Usage, SECTION
     FindArguments, SearchArguments, ReadArguments, GapOutput, ClarificationOutput,
     schema_diagnostics, _safe_text)
 from .learning_contract import SectionExplanation
+from .generation_wire import CoverageDraft, BodyClaim
 from .source_ranges import normalize_read_ranges, read_ranges_schema, read_is_permitted
 
 ENDPOINT = 'https://api.deepseek.com/chat/completions'
@@ -88,6 +89,16 @@ def _output_profile(profile, tokens):
     return True
 
 
+def generation_stage(context):
+    rows=[h['host_generation_coverage'] for h in context.history if 'host_generation_coverage' in h]
+    if not rows:return 'off'
+    if (len(rows)!=1 or type(rows[0]) is not dict or
+            rows[0].get('format')!='public_section_generation_v1' or
+            rows[0].get('stage') not in ('read','planning','prose')):
+        raise Rejected('context')
+    return rows[0]['stage']
+
+
 def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     context = _context(context); ranges = _ranges(ranges)
     tokens = min(context.remaining.output_tokens, 4000) if max_output_tokens is None else max_output_tokens
@@ -98,6 +109,10 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     reading['oneOf'] = read_ranges_schema(ranges)['oneOf']
     section = _parameters(SectionExplanation, ('kind', 'topic', 'section_id'))
     section['properties']['title']['const'] = context.anchor.section_title
+    stage=generation_stage(context)
+    if stage=='prose':
+        section['properties']['coverage_claims']={'type':'array','maxItems':256,'items':_parameters(BodyClaim)}
+        section['required'].append('coverage_claims')
     if compact:
         blocks = section['properties']['blocks']
         blocks['maxItems'] = 6
@@ -114,6 +129,7 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         'publish_section': section,
         'report_gap': _parameters(GapOutput, ('kind',)),
         'request_clarification': _parameters(ClarificationOutput, ('kind',)),
+        'submit_coverage_plan': _parameters(CoverageDraft),
     }
     descriptions = {
         'find_files':'Request approved public file names; no file execution.',
@@ -122,8 +138,12 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         'publish_section':'Submit title, blocks and gaps for this selected section only.',
         'report_gap':'Finish with missing evidence; do not fabricate a section.',
         'request_clarification':'Finish with a bounded clarification request.',
+        'submit_coverage_plan':'Submit only a public authoring checklist bound to current f:n and c:n source rows. Not private reasoning or approval.',
     }
     names = (*SOURCE_NAMES, *FINAL_NAMES)
+    if stage=='read':names=(*SOURCE_NAMES,'report_gap','request_clarification')
+    elif stage=='planning':names=(*SOURCE_NAMES,'submit_coverage_plan','report_gap','request_clarification')
+    elif stage=='prose':names=FINAL_NAMES
     if compact and tokens < MIN_SECTION_TOKENS:
         # No new reads or potentially incomplete section when the remaining
         # shared allowance is small. This is not an exact tokenizer guarantee.
@@ -235,15 +255,20 @@ def decode(envelope, context, ranges, usage, *, output_profile='off', max_output
             raise Rejected('arguments_shape')
         decoded.append((call['id'], name, args))
     final=[value for value in decoded if value[1] in FINAL_NAMES]
-    if final and len(decoded)!=1: raise Rejected('mixed_actions')
-    if final:
+    plans=[value for value in decoded if value[1]=='submit_coverage_plan']
+    if (final or plans) and len(decoded)!=1: raise Rejected('mixed_actions')
+    if plans:
+        action=dict(kind='section_plan',section_plan=plans[0][2])
+    elif final:
         _,name,args=final[0]
         if name=='publish_section':
             if args['title']!=context.anchor.section_title: raise Rejected('arguments_shape')
-            output=dict(args, kind='section_explanation',topic=context.anchor.topic,section_id=context.anchor.section_id)
+            claims=args.get('coverage_claims',[])
+            output=dict({k:v for k,v in args.items() if k!='coverage_claims'}, kind='section_explanation',topic=context.anchor.topic,section_id=context.anchor.section_id)
         elif name=='report_gap': output=dict(args,kind='gap')
         else: output=dict(args,kind='clarify')
         action=dict(kind='final',final_output=output)
+        if name=='publish_section':action['coverage_claims']=claims
     else:
         for _,name,args in decoded:
             if name=='read_excerpt' and not read_is_permitted(ranges,args): raise Rejected('read_outside_range')

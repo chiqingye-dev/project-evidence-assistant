@@ -134,10 +134,11 @@ def _json(value: Any) -> str:
 class _Runner:
     def __init__(self, adapter: ModelAdapter, tools: ToolExecutor, guard: Callable[[], None],
                  cancelled: Callable[[], bool], limits: AgentBudget, recorder: EventRecorder | None,
-                 host_context=None) -> None:
+                 host_context=None, section_generation=None) -> None:
         self.adapter, self.tools, self.guard, self.cancelled = adapter, tools, guard, cancelled
         self.limits, self.recorder = limits, recorder
         self.host_context=host_context
+        self.section_generation=section_generation
         self.started = time.monotonic()
         self.counters = RunCounters()
         self.events: list[dict[str, Any]] = []
@@ -221,9 +222,10 @@ class _Runner:
     def _context(self, initial: ModelContext) -> ModelContext:
         try:
             history=self.history
-            if self.host_context is not None:
+            if self.host_context is not None or self.section_generation is not None:
                 if initial.goal!=SECTION_GOAL:raise _Stop('failed')
-                data=self.host_context([ref.model_dump() for ref in self.evidence.values()])
+                callback=self.section_generation.context if self.section_generation is not None else self.host_context
+                data=callback([ref.model_dump() for ref in self.evidence.values()])
                 self._checkpoint()
                 if data is not None:
                     if type(data) is not dict:raise _Stop('failed')
@@ -691,9 +693,29 @@ class _Runner:
             self._event("started", "启动有界目录任务；没有读取整个工作区。" if self.goal == GOAL else "启动选定后端章节的有界任务；只按需查阅公开片段。", adapter_kind=self.kind, mode=self.mode, **prompt_identity)
             while True:
                 turn = self._model_turn(initial)
+                if turn.kind == 'section_plan':
+                    if self.goal != SECTION_GOAL or self.section_generation is None:
+                        raise _Stop('failed')
+                    plan_digest=self.section_generation.accept(turn.section_plan.model_dump(),
+                        [ref.model_dump() for ref in self.evidence.values()])
+                    self._event('coverage_plan_accepted', '公开写作计划已绑定；不是语义或发布许可。',
+                                plan_digest=plan_digest)
+                    self._checkpoint()
+                    self.history.append(dict(kind='section_plan',plan_digest=plan_digest))
+                    continue
                 if turn.kind == "final":
+                    if turn.coverage_claims and (self.section_generation is None or
+                            not isinstance(turn.final_output,SectionExplanation)):
+                        raise _Stop('failed')
+                    if self.section_generation is not None and isinstance(turn.final_output,SectionExplanation):
+                        if self.section_generation.plan is None:
+                            raise _Stop('failed')
                     status = self._final(turn.final_output)
+                    if self.section_generation is not None and status=='completed':
+                        self.section_generation.capture([c.model_dump() for c in turn.coverage_claims])
                     break
+                if self.section_generation is not None and self.section_generation.plan is not None:
+                    raise _Stop('failed')
                 if self.no_progress_turns >= self.limits.max_no_progress_turns:
                     raise _Stop("no_progress")
                 self.history.append({"kind": "tools", "calls": [call.model_dump() for call in turn.tool_calls]})
@@ -738,11 +760,18 @@ def run_agent(
     cancelled: Callable[[], bool], limits: AgentBudget | None = None,
     record_event: EventRecorder | None = None,
     initial_context: ModelContext | dict[str, Any] | None = None,
-    *, host_context=None,
+    *, host_context=None, section_generation=None,
 ) -> RunResult:
     """Run one task; callbacks receive safe events with current counter snapshots."""
     budget = AgentBudget.model_validate(limits) if limits is not None else AgentBudget()
+    if section_generation is not None:
+        from .generation_loop import GenerationSession
+        if type(section_generation) is not GenerationSession:
+            raise ValueError('host_generation_session')
+        if (budget.max_turns>6 or budget.max_tool_calls>12 or budget.max_seconds>30 or
+                budget.max_output_tokens>4000 or budget.max_retries>0):
+            raise ValueError('Cannot expand original generation-plan limits')
     if getattr(adapter, 'followup_protocol', None) == 'two_phase' and (
             budget.max_turns > 6 or budget.max_tool_calls > 12 or budget.max_seconds > 30 or budget.max_output_tokens > 4000):
         raise ValueError('Cannot expand original two-phase limits')
-    return _Runner(adapter, tools, guard, cancelled, budget, record_event,host_context).execute(initial_context)
+    return _Runner(adapter, tools, guard, cancelled, budget, record_event,host_context,section_generation).execute(initial_context)

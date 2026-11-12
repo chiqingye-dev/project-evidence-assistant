@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 import math
+import re
 import sqlite3
 from uuid import uuid4
 
@@ -185,6 +186,10 @@ class TaskStore:
                 # Action metadata only. No raw model response or private reasoning.
                 safe = {key: event[key] for key in ("kind", "message", "tool", "status", "arguments", "truncated", "items_count", "evidence_id", "guidance_sha256") if key in event}
                 safe.update(safe_metadata(event))
+                plan_digest=event.get('plan_digest')
+                if (event.get('kind')=='coverage_plan_accepted' and type(plan_digest) is str
+                        and re.fullmatch('[0-9a-f]{64}',plan_digest)):
+                    safe['plan_digest']=plan_digest
                 preparation_size = safe.pop('preparation_size', None)
                 safe["seq"] = len(payload["events"]) + 1
                 if len(payload["events"]) < 120:

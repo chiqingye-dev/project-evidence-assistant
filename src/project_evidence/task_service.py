@@ -36,6 +36,16 @@ class TaskService:
             if (type(facets) is not tuple or any(type(f) is not str or f not in FAMILIES for f in facets)
                     or len(set(facets))!=len(facets)):
                 raise ValueError('host_coverage_facets')
+            objectives=section_review_policy.public_objectives
+            if type(objectives) is not tuple:
+                raise ValueError('public_objectives')
+            if objectives:
+                from .generation_contract import PublicBrief
+                PublicBrief(objectives)
+                if not facets or type(review_contract) is not ReviewContract:
+                    raise ValueError('generation_review_policy')
+                if getattr(adapter,'kind',None)=='real' and getattr(adapter,'section_protocol',None)!='named_functions':
+                    raise ValueError('generation_native_protocol')
         self.held_reviews=HeldReviewStore(projects,create=section_review_policy is not None)
         if review_contract is not None and (type(review_contract) is not ReviewContract or section_review_policy is None):
             raise ValueError('review_contract')
@@ -51,7 +61,8 @@ class TaskService:
         self._review_clock=time.monotonic
         self.learning = LearningStore(projects)
         self.adapter = adapter if adapter is not None else UnconfiguredAdapter()
-        self.limits = AgentBudget()
+        self.limits = AgentBudget(max_retries=0) if (section_review_policy is not None and
+            section_review_policy.public_objectives) else AgentBudget()
         self._lock = RLock()
         self._thread: Thread | None = None
         self._cancel = Event()
@@ -268,7 +279,7 @@ class TaskService:
         def record_event(event: dict) -> None:
             details = event.get("details", {})
             safe = {"kind": event.get("type", "action"), "message": event.get("summary", "行动记录")}
-            for key in ("tool", "status", "arguments", "truncated", "items_count", "evidence_id", "guidance_sha256"):
+            for key in ("tool", "status", "arguments", "truncated", "items_count", "evidence_id", "guidance_sha256", "plan_digest"):
                 if key in details:
                     safe[key] = details[key]
             safe.update(engine_metadata(event))
@@ -292,11 +303,16 @@ class TaskService:
                 self.history.update(record.id, task_id, event={"kind": "transport_selected",
                     "message": "追问传输：" + protocol + ("；规划格式：" + adapter.followup_claim_format if getattr(adapter, "followup_claim_format", "literal") in ("selected_parts_v1", "selected_table_v1") else "") + ("；正文格式：" + adapter.followup_prose_format if getattr(adapter, "followup_prose_format", "indexed") in ("kind_prose_v1", "flat_prose_v1") else "") + ("；位置视图：" + adapter.followup_scope_view if getattr(adapter, "followup_scope_view", "off") in ("java_scope_edge_view_v1", "java_scope_edge_unit_columns_v1", "java_scope_edge_unit_index_columns_v1") else "") + "；只接受固定动作载体，仍执行原引用校验。"})
             host_context=None
+            generation=None
             if collector is not None:
                 facets=self.section_review_policy.coverage_facets
                 host_context=(lambda refs:collector.coverage_context(refs,facets)) if facets else collector.model_context
+                if self.section_review_policy.public_objectives:
+                    from .generation_loop import GenerationSession
+                    generation=GenerationSession(collector,facets,self.review_contract,
+                                                 self.section_review_policy.public_objectives)
             outcome = run_agent(adapter, execute, guard, cancelled, self.limits,
-                                record_event, context,host_context=host_context)
+                                record_event, context,host_context=host_context,section_generation=generation)
             payload = outcome.model_dump(mode="json")
             self.history.record_counters(record.id, task_id, payload["counters"], payload.get("evidence", []))
             status = {"clarify": "needs_clarification", "not_configured": "failed"}.get(payload["status"], payload["status"])
@@ -306,7 +322,8 @@ class TaskService:
                     with self.sources.checked_session(record, identity):
                         held=None
                         if collector is not None and status=='completed':
-                            held=collector.freeze(payload['final_output'],payload['evidence'])
+                            held=(generation.freeze(payload['final_output'],payload['evidence']) if generation is not None
+                                  else collector.freeze(payload['final_output'],payload['evidence']))
                             guard()
                             if cancelled():return
                             if time.monotonic()-started>=self.limits.max_seconds:

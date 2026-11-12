@@ -304,6 +304,11 @@ class DeepSeekAdapter:
 
     def _contract(self, context):
         schema = ModelTurn.model_json_schema()
+        # Public section plans have a separate opt-in native function carrier.
+        # Keep every legacy JSON/follow-up request on its original action schema.
+        schema['properties']['kind']['enum']=['tools','final']
+        schema['properties'].pop('section_plan',None)
+        schema['properties'].pop('coverage_claims',None)
         schema["properties"].pop("usage", None)
         schema.get("$defs", {}).pop("Usage", None)
         allowed = {"gap", "clarify", {GOAL: "directory", OUTLINE_GOAL: "chapter_outline", SECTION_GOAL: "section_explanation", FOLLOW_UP_GOAL: "follow_up"}[context.goal]}

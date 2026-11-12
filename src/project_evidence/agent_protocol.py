@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError, f
 
 from .source_policy import SourceError, normalize_github_repository, require_allowed_path, validate_relative_path
 from .content_contract import StrictContract, _IDENTIFIER, _safe_text, _safe_tree
+from .generation_wire import CoverageDraft, BodyClaim
 
 
 GOAL = "project_overview_and_learning_directory"
@@ -225,13 +226,20 @@ FinalOutput = Annotated[DirectoryOutput | GapOutput | ClarificationOutput | Chap
 
 
 class ModelTurn(StrictContract):
-    kind: Literal["tools", "final"]
+    kind: Literal["tools", "final", "section_plan"]
     tool_calls: list[ToolCall] = Field(default_factory=list, max_length=3)
     final_output: FinalOutput | None = None
     usage: Usage = Field(default_factory=Usage)
+    section_plan: CoverageDraft | None = None
+    coverage_claims: list[BodyClaim] = Field(default_factory=list, max_length=256)
 
     @model_validator(mode="after")
     def exclusive_action(self) -> ModelTurn:
+        if self.kind == 'section_plan':
+            if self.section_plan is None or self.tool_calls or self.final_output is not None or self.coverage_claims:
+                raise ValueError('A plan turn must contain only a public coverage plan')
+        elif self.section_plan is not None or (self.kind != 'final' and self.coverage_claims):
+            raise ValueError('Plan data cannot be mixed with another action')
         if self.kind == "tools" and (not self.tool_calls or self.final_output is not None):
             raise ValueError("A tools turn must contain only permitted tool calls")
         if self.kind == "final" and (self.tool_calls or self.final_output is None):

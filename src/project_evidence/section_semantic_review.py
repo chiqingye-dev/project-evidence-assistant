@@ -150,6 +150,9 @@ def packet(candidate,collector,contract):
         fields=[dict(field=k,sha256=sha256(v.encode()).hexdigest(),text=v) for k,v in fields(value['output']).items()],
         source=source,call_index=index.view(),call_audit=value['audit'],
         notice='Review the whole original section, including title/headings/diagrams/gaps, against every original criterion. Quotes bind identity, not entailment. Never infer receiver behavior or runtime proof. This is host source-assisted judgement, not personal acceptance.')
+    if 'generation_coverage_report' in value:
+        result['generation_coverage_report']=value['generation_coverage_report']
+        result['public_generation_plan']=value['generation_plan']
     if len(encoded(result).encode())>128000:raise ValueError('review_packet_limit')
     return result,index
 
@@ -199,6 +202,13 @@ def assess(candidate,collector,contract,reviewer,execution_mode):
     passed=sum(c.verdict=='pass' for c in checked.criteria)
     approved=(passed==len(contract.required) and not checked.critical_findings and
         not call_review['claim_findings'] and not call_review['bounded_body_audit']['findings'])
+    generation=view.get('generation_coverage_report')
+    if generation is not None:
+        if (generation.get('output_digest')!=view['output_digest'] or
+                generation.get('index_digest')!=view['index_digest'] or
+                generation.get('contract_digest')!=contract.digest):
+            raise ValueError('generation_review_binding')
+        approved=approved and not generation['structural_blockers']
     result=dict(format='independent_section_review_v1',task_id=view['task_id'],project_id=view['project_id'],
         commit=contract.commit,output_digest=view['output_digest'],index_digest=view['index_digest'],
         contract_digest=contract.digest,contract_document_sha256=contract.document_sha256,case_id=contract.case_id,
@@ -207,6 +217,8 @@ def assess(candidate,collector,contract,reviewer,execution_mode):
         passed=passed,total=len(contract.required),source_assisted_review_passed=approved,
         publication_approval=approved,publication_performed=False,semantic_verified=False,
         personal_acceptance=False,output_modified=False)
+    if generation is not None:
+        result['generation_coverage_report']=generation
     if len(encoded(result).encode())>64000:raise ValueError('review_receipt_limit')
     return CheckedReview(result,mint=_MINT)
 
