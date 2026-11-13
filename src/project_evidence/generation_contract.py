@@ -15,6 +15,7 @@ from project_evidence.section_semantic_review import ReviewContract, fields
 from project_evidence.source_coverage import BoundCoverage, projection, context_with_projection
 from project_evidence.source_policy import normalize_github_repository, SourceError
 from .generation_wire import CoverageDraft as Draft, GroupDraft, BodyClaim
+from .generation_diagnostics import GenerationRejected
 
 
 def digest(value):
@@ -133,16 +134,19 @@ def prepare(bound, collector, evidence, contract, brief, draft, *, layout='rows_
     try:
         checked = (GroupDraft if layout=='preloaded_groups_v1' else Draft).model_validate(draft)
     except (ValidationError, TypeError, ValueError):
-        raise ValueError('plan_shape') from None
+        raise GenerationRejected('plan_shape') from None
     if sorted(row.number for row in checked.criteria) != list(range(1, len(brief.objectives) + 1)):
-        raise ValueError('plan_criteria')
+        raise GenerationRejected('plan_criteria')
     assigned = set()
     for row in checked.criteria:
-        _safe_text(row.gap)
-        if (len(set(row.targets)) != len(row.targets) or
-                any(t not in packet['targets'] for t in row.targets) or
-                (not row.targets and not row.gap.strip())):
-            raise ValueError('plan_targets')
+        try:_safe_text(row.gap)
+        except ValueError:raise GenerationRejected('plan_text') from None
+        if len(set(row.targets)) != len(row.targets):
+            raise GenerationRejected('plan_duplicate_target','plan_targets')
+        if any(t not in packet['targets'] for t in row.targets):
+            raise GenerationRejected('plan_unknown_target','plan_targets')
+        if not row.targets and not row.gap.strip():
+            raise GenerationRejected('plan_missing_gap','plan_targets')
         assigned.update(row.targets)
     value = dict(packet, criteria=[r.model_dump() for r in checked.criteria],
         unplanned_targets=sorted(set(packet['targets']) - assigned),

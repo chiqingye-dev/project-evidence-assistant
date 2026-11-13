@@ -5,6 +5,7 @@ from .prose_shape_diagnostics import safe_shape_diagnostics
 from .citation_evidence_slots import safe_slots
 from .preparation_size_diagnostics import safe_size
 from .phase_diagnostics import PHASES, PHASE_STEPS, PHASE_REASONS, safe_wire_diagnostics
+from .generation_diagnostics import metadata as generation_metadata
 
 REASONS = frozenset({"missing_source_lines", "legacy_format", "unread_evidence", "truncated_evidence",
                      "outside_evidence", "unselected_explicit_line", "not_selected", "reversed_range",
@@ -14,7 +15,7 @@ LOCATIONS = frozenset({"heading", "text", "source_lines", "source_spans"})
 
 def safe_metadata(value):
     """Validate again at storage; discard unknown keys and invalid metadata."""
-    result = {}
+    result = generation_metadata(value)
     size=safe_size(value.get('preparation_size'))
     if size is not None:result['preparation_size']=size
     phase = value.get('phase')
@@ -70,6 +71,9 @@ def safe_metadata(value):
 def engine_metadata(event):
     """Copy elapsed snapshots already taken by the engine, without a new clock."""
     value = {}
+    if event.get('type') in {'model_returned','coverage_plan_observed','generation_rejected'}:
+        details=event.get('details',{})
+        if type(details) is dict:value.update(generation_metadata(details))
     counters = event.get("counters", {})
     seconds = counters.get("elapsed_seconds") if isinstance(counters, dict) else None
     if type(seconds) in (int, float) and 0 <= seconds <= 86_400 and math.isfinite(seconds):

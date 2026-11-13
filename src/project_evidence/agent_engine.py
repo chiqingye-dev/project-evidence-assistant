@@ -37,6 +37,7 @@ from .followup_claim_parts import FORMAT as PARTS_FORMAT, freeze_plan as freeze_
 from .followup_prose_wire import assemble
 from .phase_diagnostics import PhaseContractError, PHASE_REASONS, safe_wire_diagnostics
 from .prose_shape_diagnostics import safe_shape_diagnostics
+from .generation_diagnostics import GenerationRejected,REASONS as GENERATION_REASONS
 
 
 RunStatus = Literal[
@@ -158,6 +159,7 @@ class _Runner:
         self.goal = GOAL
         self.section_id = None
         self.topic = "query"
+        self.generation_step='preload'
 
     def _snapshot(self) -> RunCounters:
         self.counters.elapsed_seconds = round(max(0.0, time.monotonic() - self.started), 6)
@@ -201,10 +203,16 @@ class _Runner:
                     raise RuntimeError("record rejected")
             except SourceError as error:
                 self.recorder_failed = True
+                if self.section_generation is not None:
+                    self._event('generation_rejected','行动记录未保存，任务停止。',
+                        generation_check=dict(step='event_persist',reason='event_not_saved'))
                 self._check_cancel_time()
                 raise _Stop("source_changed" if error.code == "source_changed" else "failed") from None
             except Exception:
                 self.recorder_failed = True
+                if self.section_generation is not None:
+                    self._event('generation_rejected','行动记录未保存，任务停止。',
+                        generation_check=dict(step='event_persist',reason='event_not_saved'))
                 self._check_cancel_time()
                 raise _Stop("failed") from None
 
@@ -381,7 +389,7 @@ class _Runner:
             if self.counters.output_chars > self.limits.max_output_chars or self.counters.output_tokens > self.limits.max_output_tokens:
                 raise _Stop("budget_exhausted")
             self._event("model_returned", "收到结构化行动；未保存模型原文或内部思考。",
-                        **({'kind': turn.kind} if phase is None else {'phase': phase}))
+                        **({'kind': turn.kind,'model_action_kind':turn.kind} if phase is None else {'phase': phase}))
             return turn
 
     def _model_turn(self, initial: ModelContext) -> ModelTurn:
@@ -708,12 +716,21 @@ class _Runner:
                 self._checkpoint()
                 self._event('generation_capacity_checked','已接纳预读和最坏计划容量通过；尚无模型请求。')
             while True:
+                self.generation_step='model_dispatch'
                 turn = self._model_turn(initial)
+                self.generation_step='post_return'
                 if turn.kind == 'section_plan':
                     if self.goal != SECTION_GOAL or self.section_generation is None:
                         raise _Stop('failed')
-                    plan_digest=self.section_generation.accept(turn.section_plan.model_dump(),
-                        [ref.model_dump() for ref in self.evidence.values()])
+                    refs=[ref.model_dump() for ref in self.evidence.values()]
+                    draft=turn.section_plan.model_dump()
+                    self.generation_step='plan_snapshot'
+                    structure=self.section_generation.diagnostic(draft,refs)
+                    self._event('coverage_plan_observed','仅记录公开计划的脱敏结构，不是接纳或发布许可。',
+                        public_plan_structure=structure)
+                    self.generation_step='plan_accept'
+                    plan_digest=self.section_generation.accept(draft,refs)
+                    self.generation_step='plan_record'
                     self._event('coverage_plan_accepted', '公开写作计划已绑定；不是语义或发布许可。',
                                 plan_digest=plan_digest)
                     self._checkpoint()
@@ -727,9 +744,13 @@ class _Runner:
                         raise _Stop('failed')
                     if self.section_generation is not None and isinstance(turn.final_output,SectionExplanation):
                         if self.section_generation.plan is None:
+                            self._event('generation_rejected','正文缺少已接纳计划，停止。',
+                                generation_check=dict(step='final_validation',reason='plan_required'))
                             raise _Stop('failed')
+                    self.generation_step='final_validation'
                     status = self._final(turn.final_output)
                     if self.section_generation is not None and status=='completed':
+                        self.generation_step='claims_capture'
                         self.section_generation.capture([c.model_dump() for c in turn.coverage_claims])
                     break
                 if self.section_generation is not None and (self.section_generation.plan is not None or
@@ -747,10 +768,16 @@ class _Runner:
                 self.no_progress_turns = 0 if produced_data else self.no_progress_turns + 1
         except _Stop as stop:
             status = stop.status
-        except Exception:
+        except Exception as error:
             # Do not leak third-party error strings, Pydantic rejected values,
             # source excerpts or credentials into a result or action log.
             status = "failed"
+            if self.section_generation is not None:
+                reason=error.reason if type(error) is GenerationRejected and error.reason in GENERATION_REASONS else 'source_error' if isinstance(error,SourceError) else 'unexpected_exception'
+                try:
+                    self._event('generation_rejected','本地生成阶段拒绝；仅记录固定原因标签。',
+                        generation_check=dict(step=self.generation_step,reason=reason))
+                except _Stop as stop:status=stop.status
         if status not in {"completed", "gap", "clarify"}:
             self.final_output = None
             self.citations_validated = False

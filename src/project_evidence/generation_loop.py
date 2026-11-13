@@ -116,6 +116,12 @@ class GenerationSession:
                             evidence, self.contract, self.brief, draft,layout=self.layout)
         return self.plan.view()['plan_digest']
 
+    def diagnostic(self,draft,evidence):
+        from .generation_diagnostics import plan_structure
+        packet=planning_packet(build(self.collector,evidence,self.facets),self.collector,
+            evidence,self.contract,self.brief,layout=self.layout)
+        return plan_structure(draft,len(self.brief.objectives),packet['targets'])
+
     def capture(self, claims):
         if self.plan is None or self.claims is not None:
             raise ValueError('generation_plan_required')

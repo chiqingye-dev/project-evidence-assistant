@@ -1,7 +1,7 @@
 {
   "src/project_evidence/deepseek_adapter.py": "61eab5bce1fa9f9b669b7a76085e5b01b17c241249cacb213bb1b107a2d881b8",
-  "src/project_evidence/agent_engine.py": "ee09a1007bf5b2197faf0114f00729618e033bd2ec6ae9e7731d51b121fcf0d8",
-  "src/project_evidence/task_service.py": "de6f5caf6f57d50fde2da0bd2074acdc7160291714d46c04a3942d846f36e870",
+  "src/project_evidence/agent_engine.py": "2ae2cf8bfaaf20c04e5e5e4aa51e19e85e3d5783b1b3e5ceb5ecad9ee55d427e",
+  "src/project_evidence/task_service.py": "588d45e34021c52393ab696eff9a954f1355ed867141e9c9b86f09b8ecde7a04",
   "src/project_evidence/app.py": "eca062dc714dd8bc13b6c23317ac6b19ba6c202b5c22bbd63dddba59be5e5d32",
   "src/project_evidence/followup_index_columns.py": "b6dee7c613fa85c8cf12650d178663d68f8b59d9ef4490cb31e2c88e81940273",
   "src/project_evidence/followup_index_columns_codec.py": "4b661b72ab1fc0ac47e8ffe25c98811c62b8260f07063b8efcb45865f1688cdd",
@@ -13,7 +13,7 @@
   "src/project_evidence/agent_protocol.py": "b2a864f1e8f947d1c5e369ce39c1234702191a90130935a9d2c0f8b996baa117",
   "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b",
   "src/project_evidence/section_native_contract.py": "db86b67d70fae44d29401086bb027b5d9feaf0b34a2cb255f533a16c998ac4f0",
-  "src/project_evidence/section_native_binding.py": "10a46de50055fd7fa57496ba154d71b2d0e1ec6a168d30d105879c8cf837313b",
+  "src/project_evidence/section_native_binding.py": "532b90ce26f4b7a18b68f0fba9770e1f9fb590ecc80f9e08539505580522c350",
   "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
   "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c",
   "src/project_evidence/task_storage.py": "556f632e56570a09169ec3bebb9303d9b35abaa759493210d4cdcea255669378",
@@ -29,7 +29,9 @@
   "src/project_evidence/source_coverage.py": "cf7e9ff79052446ca7d67e098613fcb41e599614896f3822cb73a5c7a3c282bb",
   "src/project_evidence/source_coverage_inventory.py": "d66a172c58b5341b2085c9283114aff93fc8ef393571e371d5eaac0d36c9c2e8",
   "src/project_evidence/generation_wire.py": "72b21d3e9882da91eb3184709f0f296e65b3c46d77f0c380c7c1f2eff1f8d08f",
-  "src/project_evidence/generation_contract.py": "f87a3b6f0a64c69052d4e12c148d93d32607171293767710f0a9e97b4b75df09",
-  "src/project_evidence/generation_loop.py": "b281e3152251ec1c5bb9b0b2661bd93f76e5746924a219aab6fbf15e3d32b847",
-  "src/project_evidence/generation_view.py": "43d047392757376dab21209bbc5bf68772b7457b73e4fbaac819f78bc8aedb27"
+  "src/project_evidence/generation_contract.py": "83eeb9f0c7df289f81e17b867120643da78321746db43c0a782a4326e1ce1bc4",
+  "src/project_evidence/generation_loop.py": "b33ecfd16f89ca6d5bd69d172dcda4c7141f3d31f29fb433c890be5e9bcdeca5",
+  "src/project_evidence/generation_view.py": "43d047392757376dab21209bbc5bf68772b7457b73e4fbaac819f78bc8aedb27",
+  "src/project_evidence/generation_diagnostics.py": "a4130285a8b44f1b2fa6e2b2691f023c574898973c6ed849db92b1302d5bf96d",
+  "src/project_evidence/task_diagnostics.py": "dbc8f1bcaa2bb3e862dbddc30594a8553b023b22c6cd77c25f851ade03b9b0a8"
 }

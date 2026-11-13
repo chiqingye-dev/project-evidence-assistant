@@ -245,6 +245,7 @@ class TaskService:
         started=time.monotonic()
         collector=None
         payload=None
+        service_step='service_guard'
         def failed_candidate():
             # Retain a structurally validated original in the failed task when
             # freezing/storage fails. It is not a learning record or approval.
@@ -318,14 +319,25 @@ class TaskService:
             outcome = run_agent(adapter, execute, guard, cancelled, self.limits,
                                 record_event, context,host_context=host_context,section_generation=generation)
             payload = outcome.model_dump(mode="json")
+            # If the event callback failed, retain a finite fallback in the final
+            # CAS transaction. No model/event callback retry or terminal revival.
+            recovery=None
+            for event in reversed(payload['events']):
+                safe=engine_metadata(event)
+                if safe.get('generation_check')==dict(step='event_persist',reason='event_not_saved'):
+                    recovery=dict(kind='generation_rejected',message='行动记录未保存；终态事务保留固定诊断。',**safe)
+                    break
+            service_step='terminal_store'
             self.history.record_counters(record.id, task_id, payload["counters"], payload.get("evidence", []))
             status = {"clarify": "needs_clarification", "not_configured": "failed"}.get(payload["status"], payload["status"])
             with self._lock:
                 if not cancelled():
+                    service_step='service_guard'
                     guard()
                     with self.sources.checked_session(record, identity):
                         held=None
                         if collector is not None and status=='completed':
+                            service_step='hold_freeze'
                             held=(generation.freeze(payload['final_output'],payload['evidence']) if generation is not None
                                   else collector.freeze(payload['final_output'],payload['evidence']))
                             guard()
@@ -334,7 +346,8 @@ class TaskService:
                                 raise SourceError('timeout','冻结复核超过任务时间上限。')
                             status='needs_review'
                             payload['message']='正文候选已冻结待源码复核；未发布学习正文，不能将句法检查当成语义通过。'
-                        stored=self.history.update(record.id, task_id, status=status, message=payload["message"],
+                        service_step='terminal_store'
+                        stored=self.history.update(record.id, task_id, status=status, message=payload["message"],event=recovery,
                                             counters=payload["counters"], result=payload.get("final_output"),
                                             evidence=payload.get("evidence", []),
                                             publish=(lambda connection: self.learning.save_from_task(record.id, task_id, transaction=connection))
@@ -345,10 +358,12 @@ class TaskService:
             with self._lock:
                 status = error.code if error.code in {"source_changed", "unverified", "denied", "budget_exhausted", "timeout"} else "failed"
                 self.history.update(record.id, task_id, status=status, message="来源许可、版本或证据保存门禁使任务停止；没有发布新内容。",
+                                    event=dict(kind='generation_rejected',message='源码或保存阶段停止。',generation_check=dict(step=service_step,reason='source_error')) if collector is not None else None,
                                     result=failed_candidate() if status in {'budget_exhausted','timeout'} else None)
         except Exception:
             # Never persist raw adapter/SQL/network errors: they can contain secrets.
             self.history.update(record.id, task_id, status="failed", message="任务未完成，未保存异常原文；请检查配置和有限边界。",
+                                event=dict(kind='generation_rejected',message='本地保存阶段失败；异常原文不入日志。',generation_check=dict(step=service_step,reason='unexpected_exception')) if collector is not None else None,
                                 result=failed_candidate())
         finally:
             with self._lock:
