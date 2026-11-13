@@ -4,7 +4,7 @@
   "src/project_evidence/section_native_contract.py": "accc67b0b1530cad2b6fd07ac9ce5efcaef299c3668a3a305a4f7c5777c6f208",
   "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
   "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c",
-  "src/project_evidence/agent_engine.py": "70dd6d7c7a12cfb8f9cfd7b292efb0b913b88eca8893dfba577bc65eee174e28",
+  "src/project_evidence/agent_engine.py": "1f19b44a2ada89d8e2285bb4f099fbfa11d3af1c2c7e6d88dcb5f60a6a8690ef",
   "src/project_evidence/task_service.py": "c36696b860f4e7be304cc23b5ad5049c92ed7215922abeba15242147980e2f08",
   "src/project_evidence/learning_contract.py": "c9f22f56a71b61d460053acc0eca826643e2429108a784f18b1b290493fcedfd",
   "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b",
@@ -19,7 +19,7 @@
   "src/project_evidence/section_review.py": "05e8330416d5a7e2e397b369ee9bc886923b104bd75e92e3fc6b9bf26445f012",
   "src/project_evidence/call_binding.py": "bcd5777a0dca36225753a3fc25582b984df7eefb60c367defa6a6a1dc3e05450",
   "src/project_evidence/call_claim_contract.py": "85ce66cba00300a40a15641c547bd5466b152abfb396c7b0b8a32848db54d441",
-  "src/project_evidence/call_evidence.py": "6d64ba2c21ef2b40595e8ae7f97ac566f75dafe0e8d1b3a11f9fd53f933d066e",
+  "src/project_evidence/call_evidence.py": "c315add25e15d83fe1520bde936c9d35cc88e215b89ca1c46607633e68fa9ee0",
   "src/project_evidence/section_semantic_review.py": "905397395fabb893badeb970708852cf680ddf686f8ab052581ecbd56a0af0c5",
   "src/project_evidence/review_contracts.py": "141fdaa48c44b1c5d52a373d508076dc365e7daa55942f9ccb9420411ce928fa",
   "schemas/submission-review-golden.json": "602c000cec919584427415c434624695a939fd9638ef30df861721ace717b21f",
@@ -29,5 +29,6 @@
   "src/project_evidence/source_coverage_inventory.py": "d66a172c58b5341b2085c9283114aff93fc8ef393571e371d5eaac0d36c9c2e8",
   "src/project_evidence/generation_wire.py": "87d6677d74c497df754b5507baf0760d79b6c2b4875098adc4052bdbab925916",
   "src/project_evidence/generation_contract.py": "02d167945a306e54d9706d047691cbe735a7c8e6b9dc2da9c1926025c46bba39",
-  "src/project_evidence/generation_loop.py": "1bb093f9329454583d1c5207350c9e8fb3363cad578f83305d678de960cbe458"
+  "src/project_evidence/generation_loop.py": "1418f499aab0f9bd44aabaaf1cb6affc6cad34ddf2c990a56f44942244d29a33",
+  "src/project_evidence/generation_view.py": "43d047392757376dab21209bbc5bf68772b7457b73e4fbaac819f78bc8aedb27"
 }

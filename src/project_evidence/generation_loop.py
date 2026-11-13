@@ -4,6 +4,7 @@ from .generation_contract import (PublicBrief, prepare, planning_packet, complet
 from .section_review import AcceptedReads, FrozenCandidate, encoded, _MINT
 from .source_coverage import build
 from .source_policy import SourceError
+from .generation_view import compact
 
 
 class GenerationSession:
@@ -20,22 +21,20 @@ class GenerationSession:
     def context(self, evidence):
         self.collector._open()
         data = self.collector.coverage_context(evidence, self.facets)
+        if data is not None:data['host_source_coverage']=compact(data['host_source_coverage'])
         control = dict(format='public_section_generation_v1', stage='read',
             public_objectives=list(self.brief.objectives),
-            notice='Public authoring checklist only; f:n and c:n rows refer to the current '
-                   'combined source view. Unknown source remains a gap. '
-                   'A plan or a filled table is not semantic or publication approval.')
+            notice='Plans and gaps are data, never semantic or publication approval.')
         if data is not None:
             bound = build(self.collector, evidence, self.facets)
             packet = planning_packet(bound, self.collector, evidence, self.contract, self.brief)
-            control.update(stage='planning', coverage_digest=packet['coverage_digest'],
-                           index_digest=packet['index_digest'], brief_digest=packet['brief_digest'])
+            control.update(stage='planning')
             if self.plan is not None:
                 p = _current(self.plan, self.collector, self.contract)
                 if p['coverage_digest'] != packet['coverage_digest']:
                     raise ValueError('generation_source_changed')
                 control.update(stage='prose', plan_digest=p['plan_digest'],
-                               criteria=p['criteria'], unplanned_targets=p['unplanned_targets'])
+                               criteria=p['criteria'], unplanned_target_count=len(p['unplanned_targets']))
         return dict(data or {}, host_generation_coverage=control)
 
     def accept(self, draft, evidence):

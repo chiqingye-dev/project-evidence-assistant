@@ -50,3 +50,24 @@ unaltered output. Rejection receipts retain the generation report and reasons.
 All evidence for this integration is scripted or Mock HTTP against isolated
 Git/SQLite and synthetic billing ledgers. It is not live S03 quality acceptance,
 active installation or proof that any future prose fits the remaining budget.
+
+The planning path now uses coverage_and_calls_compact_v1. A span is a line
+number or [start,end]; a null fact subject means its kind name. A callee is its
+literal spelling or [receiver_codes index, method name]. Passing code defaults
+to the first passing_codes entry if omitted. Status/reason tables preserve every
+entry, including repeated unsupported forms. The data-only inverse must recover
+the original complete projection exactly; it never mints source authority.
+Default non-planning views are unchanged. Original source observations and tool
+history are retained, while the already-persisted plan digest is not duplicated
+in model history. Its current bound plan still appears in derived context.
+
+Question handling exempts only bounded whole-unit Chinese/English questions or
+an explicit noun-phrase unknown list. Appended assertions, factual negation and
+mixed positive claims still require review. This is a narrow phrase rule, not
+general language understanding or semantic acceptance.
+
+Full fixed-source S03 capacity replay passes a generic six-target fixture with
+only about 40-60 characters of headroom in the original spaced ModelContext
+serialization; remaining-time formatting alone changes the exact margin.
+An all-98-target plan and repeated full-source review quotations still exceed
+original caps and are rejected. This does not justify a new real-model trial.

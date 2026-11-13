@@ -701,7 +701,9 @@ class _Runner:
                     self._event('coverage_plan_accepted', '公开写作计划已绑定；不是语义或发布许可。',
                                 plan_digest=plan_digest)
                     self._checkpoint()
-                    self.history.append(dict(kind='section_plan',plan_digest=plan_digest))
+                    # The current bound plan is already in derived host context;
+                    # its persisted event carries the digest. Do not duplicate
+                    # that same marker in every subsequent model frame.
                     continue
                 if turn.kind == "final":
                     if turn.coverage_claims and (self.section_generation is None or

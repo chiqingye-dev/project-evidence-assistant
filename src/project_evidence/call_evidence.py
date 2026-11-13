@@ -160,6 +160,17 @@ def _uncertainty_only(unit,first_term):
     # A bounded noun-phrase gap states what has NOT been read; it does not say
     # a callback was passed/registered. Do not extend this to factual negation.
     compact=re.sub(r'[\s`*]','',unit)
+    # Whole-unit question/unknown-list grammar only. A question prefix must
+    # never exempt an appended assertion or factual negation from review.
+    name=IDENT+r'(?:\.'+IDENT+r')*'
+    if re.fullmatch(name+r'(?:的接收方)?是否(?:登记|注册)回调(?:[、及和]何时执行)?[?？]?',compact):
+        return True
+    if re.fullmatch(r'\s*(?:Does|Did|Will|Can)\s+'+name+r'\s+(?:register|execute)\s+(?:a\s+|the\s+)?callback\s*\?\s*',unit,re.I):
+        return True
+    if re.fullmatch(r'(?:未知项|未核实项|待核实项)[：:]'+name+r'的?(?:登记|注册)回调[与及和]执行时机[?？]?',compact):
+        return True
+    if re.fullmatch(r'回调(?:登记|注册)[与及和]执行(?:时机|时间)(?:未确认|尚未核实|未知|待查)',compact):
+        return True
     if re.fullmatch(IDENT+r'(?:\.'+IDENT+r')*的?(?:接收方)?实现[与及和]回调执行(?:时机|时间)(?:未读|尚未读取|未确认|未知|待查)',compact):
         return True
     matches=list(UNCERTAIN.finditer(unit))
