@@ -40,6 +40,7 @@ class ReviewPolicy:
     files:tuple[FileSeal,...]
     coverage_facets:tuple[str,...]=()
     public_objectives:tuple[str,...]=()
+    generation_layout:str='rows_v1'
 
     def scope(self,record,task_id,anchor):
         scope=HostScope(task_id,str(record.id),self.public_url,self.commit,self.topic,self.section_id,self.files)

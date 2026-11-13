@@ -37,6 +37,9 @@ class TaskService:
                     or len(set(facets))!=len(facets)):
                 raise ValueError('host_coverage_facets')
             objectives=section_review_policy.public_objectives
+            layout=section_review_policy.generation_layout
+            if layout not in ('rows_v1','preloaded_groups_v1') or (layout!='rows_v1' and not objectives):
+                raise ValueError('generation_layout')
             if type(objectives) is not tuple:
                 raise ValueError('public_objectives')
             if objectives:
@@ -310,7 +313,8 @@ class TaskService:
                 if self.section_review_policy.public_objectives:
                     from .generation_loop import GenerationSession
                     generation=GenerationSession(collector,facets,self.review_contract,
-                                                 self.section_review_policy.public_objectives)
+                                                 self.section_review_policy.public_objectives,
+                                                 layout=self.section_review_policy.generation_layout)
             outcome = run_agent(adapter, execute, guard, cancelled, self.limits,
                                 record_event, context,host_context=host_context,section_generation=generation)
             payload = outcome.model_dump(mode="json")

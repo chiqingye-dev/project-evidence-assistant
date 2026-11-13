@@ -14,7 +14,7 @@ from project_evidence.section_review import AcceptedReads, FrozenCandidate, enco
 from project_evidence.section_semantic_review import ReviewContract, fields
 from project_evidence.source_coverage import BoundCoverage, projection, context_with_projection
 from project_evidence.source_policy import normalize_github_repository, SourceError
-from .generation_wire import CoverageDraft as Draft, BodyClaim
+from .generation_wire import CoverageDraft as Draft, GroupDraft, BodyClaim
 
 
 def digest(value):
@@ -90,7 +90,7 @@ def _contract(collector, contract):
         raise ValueError('plan_binding')
 
 
-def planning_packet(bound, collector, evidence, contract, brief):
+def planning_packet(bound, collector, evidence, contract, brief, *, layout='rows_v1'):
     """Require current opaque source authority; rows address the existing view."""
     _contract(collector, contract)
     if type(brief) is not PublicBrief:
@@ -103,9 +103,15 @@ def planning_packet(bound, collector, evidence, contract, brief):
                for i, row in enumerate(view['facts'])}
     catalog.update({f'c:{i}': view['evidence_ids'][row[0]]
                     for i, row in enumerate(view['calls'])})
+    members={}
+    if layout=='preloaded_groups_v1':
+        members={f'g:{name}':[f'f:{i}' for i in indices] for name,indices in view['host_groups'].items() if indices}
+        if view['calls']:members['g:calls']=[f'c:{i}' for i in range(len(view['calls']))]
+        catalog={name:list(dict.fromkeys(catalog[t] for t in targets)) for name,targets in members.items()}
+    elif layout!='rows_v1':raise ValueError('generation_layout')
     if not catalog:
         raise ValueError('plan_empty_source')
-    return bounded(dict(format='source_bound_planning_packet_v1',
+    result=dict(format='source_bound_planning_packet_v1',
         task_id=collector.scope.task_id, project_id=collector.scope.project_id,
         commit=collector.scope.commit, topic=collector.scope.topic,
         section_id=collector.scope.section_id, index_digest=view['source_digest'],
@@ -115,15 +121,17 @@ def planning_packet(bound, collector, evidence, contract, brief):
         notice='Map every public authoring objective to current f:n and c:n rows or an explicit gap. '
                'Rows are syntax data, not mandatory facts or proof of explanation. '
                'Unknown receiver relationships stay unknown. No authority to publish.',
-        semantic_verified=False, publication_approval=False))
+        semantic_verified=False, publication_approval=False)
+    if members:result.update(target_mode='groups',group_members=members)
+    return bounded(result)
 
 
-def prepare(bound, collector, evidence, contract, brief, draft):
+def prepare(bound, collector, evidence, contract, brief, draft, *, layout='rows_v1'):
     """Mint while reads are open, before freeze; cannot retrofit a held answer."""
-    packet = planning_packet(bound, collector, evidence, contract, brief)
+    packet = planning_packet(bound, collector, evidence, contract, brief,layout=layout)
     bounded(draft)
     try:
-        checked = Draft.model_validate(draft)
+        checked = (GroupDraft if layout=='preloaded_groups_v1' else Draft).model_validate(draft)
     except (ValidationError, TypeError, ValueError):
         raise ValueError('plan_shape') from None
     if sorted(row.number for row in checked.criteria) != list(range(1, len(brief.objectives) + 1)):
@@ -256,11 +264,14 @@ def final_report(plan, completed, collector, contract, claims):
             finding('explanation_not_in_body')
         if claim.target is not None and match:
             cited = held['output']['blocks'][int(match[1]) - 1]['evidence_ids']
-            if p['targets'][claim.target] not in cited:
+            targets=p['targets'][claim.target]
+            targets=targets if type(targets) is list else [targets]
+            if not set(targets).intersection(cited):
                 finding('source_not_cited')
         # Narrow, negative-only detection. Arbitrary prose still needs a reviewer.
-        without_refs = re.sub(r'\b[fc]:\d+\b', '', claim.quote)
-        for eid in set(p['targets'].values()):
+        without_refs = re.sub(r'\b(?:[fc]:\d+|g:[a-z_]+)\b', '', claim.quote)
+        ids={eid for value in p['targets'].values() for eid in (value if type(value) is list else [value])}
+        for eid in ids:
             without_refs = without_refs.replace(eid, '')
         if not re.sub(r'[\W_\d]+', '', without_refs, flags=re.UNICODE):
             finding('reference_list_only')

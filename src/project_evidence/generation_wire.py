@@ -14,6 +14,16 @@ class CoverageDraft(StrictContract):
     criteria: list[PlanRow] = Field(min_length=1, max_length=12)
 
 
+class GroupRow(StrictContract):
+    number: int = Field(ge=1, le=12)
+    targets: list[str] = Field(max_length=8)
+    gap: str = Field(max_length=80)
+
+
+class GroupDraft(StrictContract):
+    criteria: list[GroupRow] = Field(min_length=1, max_length=12)
+
+
 class BodyClaim(StrictContract):
     number: int = Field(ge=1, le=12)
     target: str | None

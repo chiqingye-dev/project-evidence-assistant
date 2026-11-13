@@ -71,3 +71,42 @@ only about 40-60 characters of headroom in the original spaced ModelContext
 serialization; remaining-time formatting alone changes the exact margin.
 An all-98-target plan and repeated full-source review quotations still exceed
 original caps and are rejected. This does not justify a new real-model trial.
+
+## Optional prepaid capacity profile
+
+`ReviewPolicy.generation_layout='preloaded_groups_v1'` is a separate trusted-host
+opt-in. The old row workflow remains the default. The host preloads each exact
+approved scope range through the original guarded executor, SQL evidence commit
+and accepted-feedback event, within the same tool/time budgets. No model chooses
+these preload calls, and no fabricated accepted reads or restored JSON authority
+are used. Therefore there is no nonexistent model-tool-request history to repeat.
+All actual source observations remain available to the model and reviewer.
+
+Before the first model request, the session checks both planning and worst legal
+prose contexts. The group draft must match the public objective count, use only
+current unique group keys (at most eight), and keep each gap at most80 characters.
+The forecast includes every group in every objective, maximum quote escaping,
+wide UTF-8 data, a full digest, and 512 character/4096 byte reserves. Both original
+context serializations and native request bytes are checked. If it fails, no model
+dispatch or fee reservation occurs. The capacity record binds current source,
+coverage, public-brief and private-contract digests and is saved with the hold.
+
+Only group-plan or terminal actions are offered after preload; model source calls
+are rejected independently in the engine. Native plan/final call IDs are not put
+into later context, so their variable lengths cannot consume future context room.
+Preload IDs are known application IDs, and committed evidence IDs are known before
+the forecast. Source/session/version/cancellation checks still take precedence.
+
+`g:branches` and other g: keys refer to the complete source-table groups; `g:calls`
+refers to current calls. Full group membership and source material remain in the
+bound plan/review packet. A body claim must cite a relevant member, but that is a
+presence check, not a claim that every member was explained. Independent private
+criteria and whole-body review remain mandatory; no generation report approves
+publication. Plan and body/sidecar share the original4000-token/six-call limits.
+
+The fixed S03 synthetic worst-plan forecast is23276 characters before its512
+character reserve, against the original24000 cap. One- and128-character native
+response IDs both pass the offline fixture. Oversized public objectives stop with
+zero model calls. Source data still contains all3 files/5 ranges/211 lines and
+50 selected syntax rows/48 calls. These are capacity/Mock facts, not real provider
+token measurements, real S03 quality or installation of this candidate.

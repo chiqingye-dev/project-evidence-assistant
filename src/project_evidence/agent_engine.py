@@ -480,6 +480,9 @@ class _Runner:
                     raise _Stop("source_changed") from None
                 if error.code == "unverified":
                     raise _Stop("unverified") from None
+                if (error.code=='budget_exhausted' and self.section_generation is not None
+                        and self.section_generation.layout=='preloaded_groups_v1'):
+                    raise _Stop('budget_exhausted') from None
                 if error.code in {"denied", "invalid_path", "protected_path", "secret_detected"}:
                     raise _Stop("denied") from None
                 raise _Stop("timeout" if error.code == "timeout" else "failed") from None
@@ -691,6 +694,19 @@ class _Runner:
             identity = getattr(self.adapter, "guidance_sha256", None)
             prompt_identity = {"guidance_sha256": identity} if isinstance(identity, str) and _SHA256.fullmatch(identity) else {}
             self._event("started", "启动有界目录任务；没有读取整个工作区。" if self.goal == GOAL else "启动选定后端章节的有界任务；只按需查阅公开片段。", adapter_kind=self.kind, mode=self.mode, **prompt_identity)
+            if self.section_generation is not None and self.section_generation.layout=='preloaded_groups_v1':
+                if self.goal!=SECTION_GOAL:raise _Stop('failed')
+                for call in self.section_generation.preload_calls():
+                    if self._tool_result(call,initial).get('status')!='ok':raise _Stop('failed')
+                self._checkpoint()
+                try:
+                    receipt=self.section_generation.check_capacity(initial,self.observations,self.history,
+                        self._remaining(),self.adapter,self.limits)
+                except SourceError as error:
+                    self._checkpoint()
+                    raise _Stop('budget_exhausted' if error.code=='budget_exhausted' else 'failed') from None
+                self._checkpoint()
+                self._event('generation_capacity_checked','已接纳预读和最坏计划容量通过；尚无模型请求。')
             while True:
                 turn = self._model_turn(initial)
                 if turn.kind == 'section_plan':
@@ -716,7 +732,8 @@ class _Runner:
                     if self.section_generation is not None and status=='completed':
                         self.section_generation.capture([c.model_dump() for c in turn.coverage_claims])
                     break
-                if self.section_generation is not None and self.section_generation.plan is not None:
+                if self.section_generation is not None and (self.section_generation.plan is not None or
+                        self.section_generation.layout=='preloaded_groups_v1'):
                     raise _Stop('failed')
                 if self.no_progress_turns >= self.limits.max_no_progress_turns:
                     raise _Stop("no_progress")

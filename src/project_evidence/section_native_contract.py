@@ -14,7 +14,7 @@ from .agent_protocol import (ModelContext, ModelTurn, ModelError, Usage, SECTION
     FindArguments, SearchArguments, ReadArguments, GapOutput, ClarificationOutput,
     schema_diagnostics, _safe_text)
 from .learning_contract import SectionExplanation
-from .generation_wire import CoverageDraft, BodyClaim
+from .generation_wire import CoverageDraft, GroupDraft, BodyClaim
 from .source_ranges import normalize_read_ranges, read_ranges_schema, read_is_permitted
 
 ENDPOINT = 'https://api.deepseek.com/chat/completions'
@@ -99,6 +99,11 @@ def generation_stage(context):
     return rows[0]['stage']
 
 
+def group_generation(context):
+    rows=[h['host_generation_coverage'] for h in context.history if 'host_generation_coverage' in h]
+    return bool(rows and rows[0].get('layout')=='preloaded_groups_v1')
+
+
 def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     context = _context(context); ranges = _ranges(ranges)
     tokens = min(context.remaining.output_tokens, 4000) if max_output_tokens is None else max_output_tokens
@@ -129,7 +134,7 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         'publish_section': section,
         'report_gap': _parameters(GapOutput, ('kind',)),
         'request_clarification': _parameters(ClarificationOutput, ('kind',)),
-        'submit_coverage_plan': _parameters(CoverageDraft),
+        'submit_coverage_plan': _parameters(GroupDraft if group_generation(context) else CoverageDraft),
     }
     descriptions = {
         'find_files':'Request approved public file names; no file execution.',
@@ -144,6 +149,12 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     if stage=='read':names=(*SOURCE_NAMES,'report_gap','request_clarification')
     elif stage=='planning':names=(*SOURCE_NAMES,'submit_coverage_plan','report_gap','request_clarification')
     elif stage=='prose':names=FINAL_NAMES
+    if stage=='planning' and group_generation(context):
+        names=('submit_coverage_plan','report_gap','request_clarification')
+        keys=next(h['host_generation_coverage']['group_keys'] for h in context.history if 'host_generation_coverage' in h)
+        row=parameters['submit_coverage_plan']['properties']['criteria']['items']['properties']
+        row['targets']['items']={'type':'string','enum':keys}
+        descriptions['submit_coverage_plan']='Map public objectives to g: source-table groups or a gap of at most80 characters. Groups are planning references, not proof that every member was explained.'
     if compact and tokens < MIN_SECTION_TOKENS:
         # No new reads or potentially incomplete section when the remaining
         # shared allowance is small. This is not an exact tokenizer guarantee.
