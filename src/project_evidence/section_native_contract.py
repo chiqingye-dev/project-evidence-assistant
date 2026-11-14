@@ -14,7 +14,7 @@ from .agent_protocol import (ModelContext, ModelTurn, ModelError, Usage, SECTION
     FindArguments, SearchArguments, ReadArguments, GapOutput, ClarificationOutput,
     schema_diagnostics, _safe_text)
 from .learning_contract import SectionExplanation
-from .generation_wire import CoverageDraft, GroupDraft, BodyClaim
+from .generation_wire import CoverageDraft, GroupDraft, BodyClaim,objective_plan_model
 from .source_ranges import normalize_read_ranges, read_ranges_schema, read_is_permitted
 
 ENDPOINT = 'https://api.deepseek.com/chat/completions'
@@ -104,6 +104,20 @@ def group_generation(context):
     return bool(rows and rows[0].get('layout')=='preloaded_groups_v1')
 
 
+def public_objective_count(context):
+    rows=[h['host_generation_coverage'] for h in context.history if 'host_generation_coverage' in h]
+    if not rows:return None
+    objectives=rows[0].get('public_objectives')
+    if objectives is None and not group_generation(context):return None # Legacy non-group schema fixtures.
+    if type(objectives) is not list or not 1<=len(objectives)<=12 or any(type(x) is not str or not x.strip() for x in objectives):
+        raise Rejected('context')
+    numbers=list(range(1,len(objectives)+1))
+    if 'public_objective_numbers' in rows[0]:
+        given=rows[0]['public_objective_numbers']
+        if type(given) is not list or any(type(n) is not int for n in given) or given!=numbers:raise Rejected('context')
+    return len(objectives)
+
+
 def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     context = _context(context); ranges = _ranges(ranges)
     tokens = min(context.remaining.output_tokens, 4000) if max_output_tokens is None else max_output_tokens
@@ -115,6 +129,7 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     section = _parameters(SectionExplanation, ('kind', 'topic', 'section_id'))
     section['properties']['title']['const'] = context.anchor.section_title
     stage=generation_stage(context)
+    count=public_objective_count(context)
     if stage=='prose':
         section['properties']['coverage_claims']={'type':'array','maxItems':256,'items':_parameters(BodyClaim)}
         section['required'].append('coverage_claims')
@@ -134,7 +149,7 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         'publish_section': section,
         'report_gap': _parameters(GapOutput, ('kind',)),
         'request_clarification': _parameters(ClarificationOutput, ('kind',)),
-        'submit_coverage_plan': _parameters(GroupDraft if group_generation(context) else CoverageDraft),
+        'submit_coverage_plan': _parameters(objective_plan_model(group_generation(context),count) if count is not None else GroupDraft if group_generation(context) else CoverageDraft),
     }
     descriptions = {
         'find_files':'Request approved public file names; no file execution.',
@@ -155,6 +170,10 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         row=parameters['submit_coverage_plan']['properties']['criteria']['items']['properties']
         row['targets']['items']={'type':'string','enum':keys}
         descriptions['submit_coverage_plan']='Map public objectives to g: source-table groups or a gap of at most80 characters. Groups are planning references, not proof that every member was explained.'
+    if count is not None:
+        row=parameters['submit_coverage_plan']['properties']['criteria']['items']['properties']
+        row['number']['enum']=list(range(1,count+1))
+        descriptions['submit_coverage_plan']+=f' Return exactly {count} criteria rows, one for each public objective, numbered 1..{count} once each. Do not split, merge or invent objectives. Source groups are references, not extra objectives.'
     if compact and tokens < MIN_SECTION_TOKENS:
         # No new reads or potentially incomplete section when the remaining
         # shared allowance is small. This is not an exact tokenizer guarantee.

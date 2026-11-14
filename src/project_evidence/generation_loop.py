@@ -89,6 +89,7 @@ class GenerationSession:
         if data is not None:data['host_source_coverage']=compact(data['host_source_coverage'])
         control = dict(format='public_section_generation_v1', stage='read',
             public_objectives=list(self.brief.objectives),
+            public_objective_numbers=list(range(1,len(self.brief.objectives)+1)),
             notice='Plans and gaps are data, never semantic or publication approval.')
         if data is not None:
             bound = build(self.collector, evidence, self.facets)

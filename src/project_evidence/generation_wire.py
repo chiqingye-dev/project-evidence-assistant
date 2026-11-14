@@ -1,6 +1,7 @@
 """Bounded public plan/claim data, never tool or review authority."""
 from typing import Literal
-from pydantic import Field
+from functools import lru_cache
+from pydantic import Field,create_model
 from .content_contract import StrictContract
 
 
@@ -22,6 +23,21 @@ class GroupRow(StrictContract):
 
 class GroupDraft(StrictContract):
     criteria: list[GroupRow] = Field(min_length=1, max_length=12)
+
+
+@lru_cache(maxsize=24)
+def objective_plan_model(group,count):
+    """The provider schema follows the same public objective count as the host.
+
+    The original host still verifies numbering/uniqueness and source identity.
+    This model is for request schema construction, not an alternate release path.
+    """
+    if type(group) is not bool or type(count) is not int or not 1<=count<=12:
+        raise ValueError('public_objective_count')
+    row=create_model(f'PublicObjectiveRow{int(group)}N{count}',__base__=GroupRow if group else PlanRow,
+        number=(int,Field(ge=1,le=count)))
+    return create_model(f'PublicObjectivePlan{int(group)}N{count}',__base__=GroupDraft if group else CoverageDraft,
+        criteria=(list[row],Field(min_length=count,max_length=count)))
 
 
 class BodyClaim(StrictContract):
