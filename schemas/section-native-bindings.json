@@ -1,7 +1,7 @@
 {
   "src/project_evidence/agent_protocol.py": "b2a864f1e8f947d1c5e369ce39c1234702191a90130935a9d2c0f8b996baa117",
   "src/project_evidence/deepseek_adapter.py": "61eab5bce1fa9f9b669b7a76085e5b01b17c241249cacb213bb1b107a2d881b8",
-  "src/project_evidence/section_native_contract.py": "e6e829e4eee99788ec78e5b97f190d48b1e8b5b53ceb92f69ec7bed1f1588195",
+  "src/project_evidence/section_native_contract.py": "9a88799e92c7803133534bcf788c97c5e5a7fa253962054d79a037f63a744a04",
   "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
   "prompts/submission-native-section.txt": "cf95e279e0267e769ef9304cbea815fcb04030022101a3f46c7d8cffc72cf75c",
   "src/project_evidence/agent_engine.py": "4cbc7c51632c1a96ebb84b9b987b556ad63aed815fb06c0f407cbb5536bc6111",

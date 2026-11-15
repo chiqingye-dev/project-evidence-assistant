@@ -118,6 +118,30 @@ def public_objective_count(context):
     return len(objectives)
 
 
+def bound_group_claims(context,count):
+    """Constrain only public choices known before this body is written.
+
+    Pairing, field existence and exact quote uniqueness remain host checks.
+    The optional provider schema does not grant acceptance or publication.
+    """
+    control=next(h['host_generation_coverage'] for h in context.history if 'host_generation_coverage' in h)
+    try:plan=GroupDraft.model_validate(dict(criteria=control['criteria']))
+    except (KeyError,TypeError,ValueError):raise Rejected('context') from None
+    keys=control.get('group_keys')
+    groups=('g:calls','g:branches','g:queries','g:snapshot_fields','g:writes','g:write_inputs','g:payload_response')
+    if (type(keys) is not list or not 1<=len(keys)<=8 or any(type(k) is not str or k not in groups for k in keys)
+            or len(set(keys))!=len(keys) or sorted(r.number for r in plan.criteria)!=list(range(1,count+1))):
+        raise Rejected('context')
+    selected=set();gap=False
+    for row in plan.criteria:
+        if len(set(row.targets))!=len(row.targets) or any(t not in keys for t in row.targets) or not row.targets and not row.gap.strip():raise Rejected('context')
+        selected.update(row.targets);gap=gap or bool(row.gap.strip())
+    schema=_parameters(BodyClaim);properties=schema['properties']
+    properties['number'].update(maximum=count,enum=list(range(1,count+1)))
+    properties['target']['enum']=sorted(selected)+([None] if gap else [])
+    return schema
+
+
 def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     context = _context(context); ranges = _ranges(ranges)
     tokens = min(context.remaining.output_tokens, 4000) if max_output_tokens is None else max_output_tokens
@@ -131,7 +155,8 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     stage=generation_stage(context)
     count=public_objective_count(context)
     if stage=='prose':
-        section['properties']['coverage_claims']={'type':'array','maxItems':256,'items':_parameters(BodyClaim)}
+        claims=bound_group_claims(context,count) if group_generation(context) else _parameters(BodyClaim)
+        section['properties']['coverage_claims']={'type':'array','maxItems':256,'items':claims}
         section['required'].append('coverage_claims')
     if compact:
         blocks = section['properties']['blocks']
@@ -160,6 +185,8 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         'request_clarification':'Finish with a bounded clarification request.',
         'submit_coverage_plan':'Submit only a public authoring checklist bound to current f:n and c:n source rows. Not private reasoning or approval.',
     }
+    if stage=='prose' and group_generation(context):
+        descriptions['publish_section']+=' Match each coverage claim number/target pair to the bound public criteria. A null target is only for a planned gap. Field must exist in this returned body and quote must occur exactly once in that field; never invent a quote or cite an unwritten field.'
     names = (*SOURCE_NAMES, *FINAL_NAMES)
     if stage=='read':names=(*SOURCE_NAMES,'report_gap','request_clarification')
     elif stage=='planning':names=(*SOURCE_NAMES,'submit_coverage_plan','report_gap','request_clarification')
