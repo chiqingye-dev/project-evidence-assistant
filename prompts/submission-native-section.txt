@@ -1,9 +1,10 @@
 named_section_functions_v1：仅通过本轮提供的函数提交动作，content保持为空，不另输出动作JSON、说明或围栏。
 工具动作使用find_files、search_text、read_excerpt。每轮可请求最多3个只读工具，不得与结束函数混在同轮；不执行Shell/Java/SQL/Docker/HTTP写入。不读获准范围外或拒绝文件，不改参数绕过拒绝，不索取凭据。
-完成正文时只调用publish_section，参数只有title、blocks、gaps，title必须等于anchor.section_title；引用和正文仍使用原blocks字段。报告缺证据用report_gap(message,gaps)，需澄清用request_clarification(question,options,evidence_ids)。结束函数每轮只能有一个。
+只使用当前阶段提供的函数，参数以本轮函数Schema为准。完成正文时只调用publish_section，title必须等于anchor.section_title；正文和引用仍使用blocks字段，缺口使用gaps。若本轮Schema含coverage_claims，它也是必填参数；未声明该字段时不要添加。报告缺证据用report_gap(message,gaps)，需澄清用request_clarification(question,options,evidence_ids)。结束函数每轮只能有一个。
+需要coverage_claims时，按绑定计划逐一提交(number,target)声明；每项非空计划gap还须额外提交同number、target=null、kind=unknown的独立声明，即使该项已有targets也不能省略。field使用精确位置名，若Schema列出可选值则只能从中选择；索引从1开始，例如block:1:text或gap:1，且必须是本次正文实际存在的位置。quote逐字摘取该位置中恰好出现一次的原文；解释声明须指向block:N:text，标题不算正文解释。不能用来源组名代替正文位置。
 不生成kind、topic、section_id或action/final_output外层；这些动作与目标标签由固定函数名和宿主已选anchor绑定。函数调用仅提交数据，宿主会依原合同校验后才执行工具或保存正文。
 
 本任务仅讲anchor.topic=submission及已选小节。目录/目标/导航行号/注释/本指导都不是源码证据。只有本任务实际读到且支持结论的引用才能支持事实；方法调用不证明被调内部。未读只保留缺口，不能先断言后用末尾缺口撤回。图、问答、教学解释适用同样要求。
 若section_id=transaction-write，固定公开版本可导航Service35～68、TransactionService26～105、Mapper.lockQuota，再按需读Mapper83～114/133～196及TransactionService15。导航不是引用，实际版本/方法不符须重新定位，权限不允许就报告缺口；不能扩大读取。
 查证事务声明/调用顺序、锁和计数SQL、账号/旧请求复查、常量/比较/异常、版本来源、写入顺序/各表字段、payload及返回对象。每个答案要有实际片段支持，跨文件分别引用；注解、SQL或静态图不证明运行事务、消息投递/消费/判题完成。不要将未读AccountService、RequestCoalescer、limits.check、afterCommit或数据库运行保证包装为事实；已经读到的显式条件/SQL不要误列未读。
-建议6～8个正文块，必要事实及引用优先；不粘贴原始SQL/Java/JSON模板。不以流畅度、图渲染或保存成功当质量通过。预算不够就report_gap，不制造完整结果。
+正文块数和长度遵守本轮Schema，必要事实及引用优先；不粘贴原始SQL/Java/JSON模板。不以流畅度、图渲染或保存成功当质量通过。预算不够就report_gap，不制造完整结果。

@@ -132,14 +132,34 @@ def bound_group_claims(context,count):
     if (type(keys) is not list or not 1<=len(keys)<=8 or any(type(k) is not str or k not in groups for k in keys)
             or len(set(keys))!=len(keys) or sorted(r.number for r in plan.criteria)!=list(range(1,count+1))):
         raise Rejected('context')
-    selected=set();gap=False
+    selected=set();gap=False;obligations=0
     for row in plan.criteria:
         if len(set(row.targets))!=len(row.targets) or any(t not in keys for t in row.targets) or not row.targets and not row.gap.strip():raise Rejected('context')
         selected.update(row.targets);gap=gap or bool(row.gap.strip())
+        obligations+=len(row.targets)+bool(row.gap.strip())
     schema=_parameters(BodyClaim);properties=schema['properties']
     properties['number'].update(maximum=count,enum=list(range(1,count+1)))
     properties['target']['enum']=sorted(selected)+([None] if gap else [])
-    return schema
+    return schema,obligations
+
+
+def body_claim_selectors(section):
+    """Advertise host field names within this request's effective body bounds.
+
+    An enum entry is only a possible location, not proof it was written.
+    Actual field existence and exact unique quotes still require host checks.
+    """
+    properties=section['properties']
+    fields=['title']
+    for number in range(1,properties['blocks']['maxItems']+1):
+        fields.extend((f'block:{number}:heading',f'block:{number}:text'))
+    fields.extend(f'gap:{number}' for number in range(1,properties['gaps']['maxItems']+1))
+    claim=properties['coverage_claims']['items']['properties']
+    claim['field'].update(enum=fields,description=(
+        'Exact host selector, using one-based indexes: title, block:1:heading, '
+        'block:1:text, gap:1. Choose a field actually present in this returned body. '
+        'An explanation must quote block:N:text; titles and headings do not satisfy body explanation.'))
+    claim['quote']['description']='Copy a nonempty exact substring that occurs exactly once in the selected field.'
 
 
 def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
@@ -155,8 +175,10 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
     stage=generation_stage(context)
     count=public_objective_count(context)
     if stage=='prose':
-        claims=bound_group_claims(context,count) if group_generation(context) else _parameters(BodyClaim)
+        if group_generation(context):claims,obligations=bound_group_claims(context,count)
+        else:claims=_parameters(BodyClaim)
         section['properties']['coverage_claims']={'type':'array','maxItems':256,'items':claims}
+        if group_generation(context):section['properties']['coverage_claims'].update(minItems=obligations,maxItems=obligations)
         section['required'].append('coverage_claims')
     if compact:
         blocks = section['properties']['blocks']
@@ -167,6 +189,7 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         block['evidence_ids']['maxItems'] = 3
         section['properties']['gaps']['maxItems'] = 3
         section['properties']['gaps']['items']['maxLength'] = 100
+    if stage=='prose' and group_generation(context):body_claim_selectors(section)
     parameters = {
         'find_files': _parameters(FindArguments),
         'search_text': _parameters(SearchArguments),
@@ -186,7 +209,11 @@ def functions(context, ranges, *, output_profile='off', max_output_tokens=None):
         'submit_coverage_plan':'Submit only a public authoring checklist bound to current f:n and c:n source rows. Not private reasoning or approval.',
     }
     if stage=='prose' and group_generation(context):
-        descriptions['publish_section']+=' Match each coverage claim number/target pair to the bound public criteria. A null target is only for a planned gap. Field must exist in this returned body and quote must occur exactly once in that field; never invent a quote or cite an unwritten field.'
+        descriptions['publish_section']+=(f' Return exactly {obligations} coverage claims: one for each bound '
+            '(number,target) pair, PLUS one separate (same number,null) claim of kind unknown for each nonempty '
+            'planned gap, even when that criterion also has targets. A null target is only for a planned gap. '
+            'Use exact one-based field selectors such as block:1:text or gap:1. Field must exist in this returned '
+            'body and quote must occur exactly once in that field; never invent a quote or cite an unwritten field.')
     names = (*SOURCE_NAMES, *FINAL_NAMES)
     if stage=='read':names=(*SOURCE_NAMES,'report_gap','request_clarification')
     elif stage=='planning':names=(*SOURCE_NAMES,'submit_coverage_plan','report_gap','request_clarification')
