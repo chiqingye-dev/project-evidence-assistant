@@ -19,6 +19,7 @@ from .source_service import SourceService
 from .storage import ProjectStore
 from .task_storage import ACTIVE, MAX_TASK_RECORDS, TaskStore
 from .task_diagnostics import engine_metadata
+from .generation_diagnostics import freeze_check
 from .section_review import ReviewPolicy, AcceptedReads, HeldReviewStore
 from .section_semantic_review import ReviewContract,HostReviewer,ReviewStore,assess
 
@@ -340,6 +341,7 @@ class TaskService:
                             service_step='hold_freeze'
                             held=(generation.freeze(payload['final_output'],payload['evidence']) if generation is not None
                                   else collector.freeze(payload['final_output'],payload['evidence']))
+                            if generation is not None:service_step='freeze_post_guard'
                             guard()
                             if cancelled():return
                             if time.monotonic()-started>=self.limits.max_seconds:
@@ -356,14 +358,17 @@ class TaskService:
                         if stored and held is not None:self._held_live[task_id]=(collector,held,identity)
         except SourceError as error:
             with self._lock:
+                failed_step=getattr(generation,'freeze_step','hold_freeze') if service_step=='hold_freeze' else service_step
                 status = error.code if error.code in {"source_changed", "unverified", "denied", "budget_exhausted", "timeout"} else "failed"
                 self.history.update(record.id, task_id, status=status, message="来源许可、版本或证据保存门禁使任务停止；没有发布新内容。",
-                                    event=dict(kind='generation_rejected',message='源码或保存阶段停止。',generation_check=dict(step=service_step,reason='source_error')) if collector is not None else None,
+                                    event=dict(kind='generation_rejected',message='源码或保存阶段停止。',generation_check=dict(step=failed_step,reason='source_error')) if collector is not None else None,
                                     result=failed_candidate() if status in {'budget_exhausted','timeout'} else None)
-        except Exception:
+        except Exception as error:
             # Never persist raw adapter/SQL/network errors: they can contain secrets.
+            check=(freeze_check(getattr(generation,'freeze_step','hold_freeze'),error)
+                   if service_step=='hold_freeze' else dict(step=service_step,reason='unexpected_exception'))
             self.history.update(record.id, task_id, status="failed", message="任务未完成，未保存异常原文；请检查配置和有限边界。",
-                                event=dict(kind='generation_rejected',message='本地保存阶段失败；异常原文不入日志。',generation_check=dict(step=service_step,reason='unexpected_exception')) if collector is not None else None,
+                                event=dict(kind='generation_rejected',message='本地保存阶段失败；异常原文不入日志。',generation_check=check) if collector is not None else None,
                                 result=failed_candidate())
         finally:
             with self._lock:

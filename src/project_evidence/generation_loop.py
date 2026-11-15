@@ -23,6 +23,7 @@ class GenerationSession:
         if layout not in ('rows_v1','preloaded_groups_v1'):raise ValueError('generation_layout')
         self.layout=layout
         self.capacity_receipt=None
+        self.freeze_step='hold_freeze'
         if layout=='preloaded_groups_v1' and not 1<=len(self.preload_calls())<=12:
             raise ValueError('generation_preload_limit')
 
@@ -128,15 +129,22 @@ class GenerationSession:
             raise ValueError('generation_plan_required')
         self.claims = claims
 
+    def claim_diagnostic(self,output):
+        from .generation_diagnostics import claim_structure
+        return claim_structure(self.claims,self.plan.view(),output)
+
     def freeze(self, output, evidence):
+        self.freeze_step='freeze_complete'
         if self.plan is None or self.claims is None:
             raise ValueError('generation_final_unbound')
         completed = complete(self.plan, self.collector, self.contract, output, evidence)
+        self.freeze_step='freeze_report'
         report = final_report(self.plan, completed, self.collector, self.contract, self.claims)
         # An explicitly unknown statement is review data, not an automatic
         # failure of an objective that legitimately asks to preserve a gap.
         # All other negative structural findings veto release even if a
         # scripted/host reviewer mistakenly marks every private criterion pass.
+        self.freeze_step='freeze_encode'
         report['structural_blockers'] = [f for f in report['findings']
                                         if f['reason'] != 'declared_unknown_not_explained']
         held = completed.view()

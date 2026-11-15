@@ -752,6 +752,9 @@ class _Runner:
                     if self.section_generation is not None and status=='completed':
                         self.generation_step='claims_capture'
                         self.section_generation.capture([c.model_dump() for c in turn.coverage_claims])
+                        self.generation_step='claims_snapshot'
+                        self._event('coverage_claims_observed','仅记录覆盖声明安全结构，不是语义或发布许可。',
+                            public_claim_structure=self.section_generation.claim_diagnostic(turn.final_output.model_dump()))
                     break
                 if self.section_generation is not None and (self.section_generation.plan is not None or
                         self.section_generation.layout=='preloaded_groups_v1'):

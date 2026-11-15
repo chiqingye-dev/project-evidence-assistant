@@ -217,16 +217,16 @@ def final_report(plan, completed, collector, contract, claims):
     p = _current(plan, collector, contract)
     if (type(completed) is not PlannedFinal or completed._mint is not _MINT or
             completed._plan is not plan or not collector._frozen):
-        raise ValueError('plan_final_binding')
+        raise GenerationRejected('plan_final_binding')
     candidate = completed._candidate
     if type(candidate) is not FrozenCandidate:
-        raise ValueError('plan_final_binding')
+        raise GenerationRejected('plan_final_binding')
     held = candidate.view()
     if (any(held[k] != p[k] for k in ('task_id', 'project_id', 'commit', 'topic', 'section_id', 'index_digest'))
             or held['output_digest'] != digest(held['output'])):
-        raise ValueError('plan_final_binding')
+        raise GenerationRejected('plan_final_binding')
     if type(claims) is not list or len(claims) > 256:
-        raise ValueError('body_claim_shape')
+        raise GenerationRejected('body_claim_shape')
     bounded(claims, 32000)
     available = fields(held['output'])
     expected = {(row['number'], t) for row in p['criteria'] for t in row['targets']}
@@ -237,20 +237,20 @@ def final_report(plan, completed, collector, contract, claims):
         try:
             claim = BodyClaim.model_validate(raw)
         except (ValidationError, TypeError, ValueError):
-            raise ValueError('body_claim_shape') from None
+            raise GenerationRejected('body_claim_shape') from None
         key = (claim.number, claim.target)
         if key not in expected or key in seen:
-            raise ValueError('body_claim_target')
+            raise GenerationRejected('body_claim_target')
         seen.add(key)
         _safe_text(claim.quote)
         if not claim.quote.strip():
-            raise ValueError('body_claim_quote')
+            raise GenerationRejected('body_claim_quote')
         text = available.get(claim.field)
         if text is None:
-            raise ValueError('body_claim_field')
+            raise GenerationRejected('body_claim_field')
         start = text.find(claim.quote)
         if start < 0 or text.find(claim.quote, start + 1) >= 0:
-            raise ValueError('body_claim_quote')
+            raise GenerationRejected('body_claim_quote')
         row = dict(number=claim.number, target=claim.target, field=claim.field,
                    start=start, end=start + len(claim.quote), kind=claim.kind)
         bound_claims.append(row)
