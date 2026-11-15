@@ -5,11 +5,11 @@ import json,re
 ACTIONS=frozenset({'tools','section_plan','final'})
 STEPS=frozenset({'preload','model_dispatch','post_return','plan_snapshot','plan_accept','plan_record',
     'final_validation','claims_capture','claims_snapshot','event_persist','service_guard','hold_freeze',
-    'freeze_complete','freeze_report','freeze_encode','freeze_post_guard','terminal_store'})
+    'freeze_complete','freeze_report','freeze_encode','freeze_post_guard','terminal_store','native_decode'})
 REASONS=frozenset({'plan_shape','plan_criteria','plan_duplicate_target','plan_unknown_target','plan_missing_gap',
     'plan_text','plan_required','unexpected_exception','source_error','event_not_saved',
     'body_claim_shape','body_claim_target','body_claim_quote','body_claim_field','plan_final_binding',
-    'schema_error','type_error','key_error','value_error'})
+    'schema_error','type_error','key_error','value_error','native_rejected'})
 TARGET=re.compile(r'^(?:[fc]:[0-9]{1,3}|g:(?:branches|queries|snapshot_fields|writes|write_inputs|payload_response|calls))$')
 
 
@@ -70,12 +70,16 @@ def safe_plan_structure(value):
 
 
 def metadata(value):
+    from .native_rejection_diagnostics import safe_native_rejection
     result={};kind=value.get('model_action_kind')
+    native=safe_native_rejection(value.get('native_rejection'))
+    if native is not None:result['native_rejection']=native
     if type(kind) is str and kind in ACTIONS:result['model_action_kind']=kind
     check=value.get('generation_check')
     if type(check) is dict and set(check)=={'step','reason'}:
         step,reason=check['step'],check['reason']
-        if type(step) is str and step in STEPS and type(reason) is str and reason in REASONS:
+        if (type(step) is str and step in STEPS and type(reason) is str and reason in REASONS
+                and (step!='native_decode' or (native is not None and reason=='native_rejected'))):
             result['generation_check']=dict(step=step,reason=reason)
     plan=safe_plan_structure(value.get('public_plan_structure'))
     if plan is not None:result['public_plan_structure']=plan

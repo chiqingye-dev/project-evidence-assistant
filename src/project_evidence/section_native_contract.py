@@ -14,6 +14,7 @@ from .agent_protocol import (ModelContext, ModelTurn, ModelError, Usage, SECTION
     FindArguments, SearchArguments, ReadArguments, GapOutput, ClarificationOutput,
     schema_diagnostics, _safe_text)
 from .learning_contract import SectionExplanation
+from .native_rejection_diagnostics import projection, safe_native_rejection
 from .generation_wire import CoverageDraft, GroupDraft, BodyClaim,objective_plan_model
 from .source_ranges import normalize_read_ranges, read_ranges_schema, read_is_permitted
 
@@ -28,10 +29,11 @@ _REASONS = frozenset({'context', 'ranges', 'schema', 'guidance', 'budget', 'enve
 
 
 class Rejected(ValueError):
-    def __init__(self, reason, *, diagnostics=()):
+    def __init__(self, reason, *, diagnostics=(), native_rejection=None):
         self.reason = reason if reason in _REASONS else 'native_action_invalid'
         # Only the original fixed diagnostic whitelist may cross this boundary.
         self.diagnostics = ModelError('invalid_response', diagnostics=diagnostics).diagnostics
+        self.native_rejection=safe_native_rejection(native_rejection)
         super().__init__(self.reason)
 
 
@@ -334,9 +336,16 @@ def decode(envelope, context, ranges, usage, *, output_profile='off', max_output
         if not isinstance(function, dict) or set(function)!={'name','arguments'}: raise Rejected('envelope')
         name=function['name']
         if not isinstance(name, str) or name not in definitions: raise Rejected('function_unknown')
-        args=_arguments(function['arguments']); schema=definitions[name]
-        if not set(args).issubset(schema['properties']) or not set(schema.get('required', [])).issubset(args):
-            raise Rejected('arguments_shape')
+        phase=generation_stage(context)
+        try:args=_arguments(function['arguments'])
+        except Rejected as error:
+            raise Rejected(error.reason,diagnostics=error.diagnostics,
+                native_rejection=projection(phase,name,error.reason)) from None
+        schema=definitions[name]
+        extra=set(args)-set(schema['properties']);missing=set(schema.get('required', []))-set(args)
+        if extra or missing:
+            raise Rejected('arguments_shape',native_rejection=projection(phase,name,'keys',
+                missing_fields=sorted(missing),extra_fields_count=len(extra)))
         decoded.append((call['id'], name, args))
     final=[value for value in decoded if value[1] in FINAL_NAMES]
     plans=[value for value in decoded if value[1]=='submit_coverage_plan']
@@ -346,7 +355,7 @@ def decode(envelope, context, ranges, usage, *, output_profile='off', max_output
     elif final:
         _,name,args=final[0]
         if name=='publish_section':
-            if args['title']!=context.anchor.section_title: raise Rejected('arguments_shape')
+            if args['title']!=context.anchor.section_title: raise Rejected('arguments_shape',native_rejection=projection(generation_stage(context),name,'title'))
             claims=args.get('coverage_claims',[])
             output=dict({k:v for k,v in args.items() if k!='coverage_claims'}, kind='section_explanation',topic=context.anchor.topic,section_id=context.anchor.section_id)
         elif name=='report_gap': output=dict(args,kind='gap')
@@ -359,14 +368,20 @@ def decode(envelope, context, ranges, usage, *, output_profile='off', max_output
         action=dict(kind='tools',tool_calls=[dict(id=identifier,name=name,arguments=args) for identifier,name,args in decoded])
     try: result = ModelTurn.model_validate(dict(action,usage=usage.model_dump()))
     except ValidationError as error:
-        raise Rejected('native_action_invalid',diagnostics=schema_diagnostics(error)) from None
+        raise Rejected('native_action_invalid',diagnostics=schema_diagnostics(error),native_rejection=projection(generation_stage(context),decoded[0][1],'model_validation')) from None
     if output_profile == COMPACT_PROFILE and final and final[0][1] == 'publish_section':
         # strict=False upstream remains advisory: check the same narrowed
         # profile locally, after the original contract. Never trim or repair.
         output = result.final_output
-        if (len(output.blocks) > 6 or len(output.gaps) > 3
-                or any(len(gap) > 100 for gap in output.gaps)
-                or any(len(b.heading) > 48 or len(b.text) > 320 or len(b.evidence_ids) > 3
-                       for b in output.blocks)):
-            raise Rejected('arguments_shape')
+        def over(reason,observed,limit,index=0):
+            if observed>limit:
+                raise Rejected('arguments_shape',native_rejection=projection(generation_stage(context),
+                    'publish_section',reason,observed=observed,limit=limit,block_index=index))
+        over('compact_blocks',len(output.blocks),6)
+        over('compact_gaps',len(output.gaps),3)
+        for gap in output.gaps:over('compact_gap_chars',len(gap),100)
+        for index,block in enumerate(output.blocks,1):
+            over('compact_heading_chars',len(block.heading),48,index)
+            over('compact_text_chars',len(block.text),320,index)
+            over('compact_evidence_count',len(block.evidence_ids),3,index)
     return result

@@ -581,7 +581,7 @@ class DeepSeekAdapter:
                         output_profile=self.section_output_profile,max_output_tokens=max_output_tokens)
                 except section_native_contract.Rejected as error:
                     raise ModelError('output_limit' if error.reason=='output_limit' else 'invalid_response',usage=usage,
-                        diagnostics=('section_native.'+error.reason,*error.diagnostics)) from None
+                        diagnostics=('section_native.'+error.reason,*error.diagnostics),native_rejection=error.native_rejection) from None
             if function_carrier:
                 content = strict_function_protocol.action_text(envelope, usage)
             elif responses:

@@ -525,14 +525,18 @@ def schema_diagnostics(error: ValidationError) -> tuple[str, ...]:
     return tuple(labels[:8])
 
 
+from .native_rejection_diagnostics import safe_native_rejection
+
+
 class ModelError(Exception):
     def __init__(self, code: str, retryable: bool = False, *, usage: Usage | None = None,
-                 request_sent: bool | None = None, diagnostics: tuple[str, ...] = ()) -> None:
+                 request_sent: bool | None = None, diagnostics: tuple[str, ...] = (), native_rejection=None) -> None:
         self.code = code if code in _MODEL_ERRORS else "invalid_response"
         self.retryable = bool(retryable and self.code in {"temporary_error", "timeout"})
         self.message = _MODEL_ERRORS[self.code]
         self.usage = Usage.model_validate(usage) if usage is not None else None
         self.request_sent = request_sent
+        self.native_rejection = safe_native_rejection(native_rejection)
         self.diagnostics = tuple(item for item in diagnostics if item in _MODEL_DIAGNOSTICS)[:8]
         super().__init__(self.message)
 

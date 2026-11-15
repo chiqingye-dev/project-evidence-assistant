@@ -38,6 +38,7 @@ from .followup_prose_wire import assemble
 from .phase_diagnostics import PhaseContractError, PHASE_REASONS, safe_wire_diagnostics
 from .prose_shape_diagnostics import safe_shape_diagnostics
 from .generation_diagnostics import GenerationRejected,REASONS as GENERATION_REASONS
+from .native_rejection_diagnostics import safe_native_rejection
 
 
 RunStatus = Literal[
@@ -354,8 +355,11 @@ class _Runner:
                 # Preserve only fixed diagnostics before a timeout/cancel/source
                 # checkpoint takes precedence. This never authorizes a retry or
                 # publishes model output, and the recorder still uses task CAS.
+                native=safe_native_rejection(error.native_rejection)
+                details={} if native is None else dict(native_rejection=native,
+                    generation_check=dict(step='native_decode',reason='native_rejected'))
                 self._event("model_error", "模型响应停止：" + error.code +
-                            ("；合同类别：" + ", ".join(error.diagnostics) if error.diagnostics else ""))
+                            ("；合同类别：" + ", ".join(error.diagnostics) if error.diagnostics else ""),**details)
                 self._checkpoint()
                 if phase is not None:
                     error.retryable = False  # No automatic re-dispatch of either phase.

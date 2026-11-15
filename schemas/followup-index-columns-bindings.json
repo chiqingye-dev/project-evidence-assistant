@@ -1,6 +1,6 @@
 {
-  "src/project_evidence/deepseek_adapter.py": "61eab5bce1fa9f9b669b7a76085e5b01b17c241249cacb213bb1b107a2d881b8",
-  "src/project_evidence/agent_engine.py": "4cbc7c51632c1a96ebb84b9b987b556ad63aed815fb06c0f407cbb5536bc6111",
+  "src/project_evidence/deepseek_adapter.py": "6005c01907970d1359f908b77ca8905b7044e822461a88d3377b0e917cb86d1b",
+  "src/project_evidence/agent_engine.py": "e3b26fda4337749733058754feb6d71f8a8bbce7ca45f0ddf8ac53d2a2395e7b",
   "src/project_evidence/task_service.py": "be82446d018bb9d96eb25696af0886fe3e8c08b7b0fc9eab26168027d399bdf3",
   "src/project_evidence/app.py": "eca062dc714dd8bc13b6c23317ac6b19ba6c202b5c22bbd63dddba59be5e5d32",
   "src/project_evidence/followup_index_columns.py": "b6dee7c613fa85c8cf12650d178663d68f8b59d9ef4490cb31e2c88e81940273",
@@ -10,10 +10,10 @@
   "src/project_evidence/followup_prose_kind.py": "64571978697fc1459812f7bbd9635e252e63f2daacfc84735bda7cdda0cf3629",
   "prompts/learning-guide.txt": "f2cb69c7ead3e7d505daa8a923a5f318fad7f481ce01b21b2a4693b3603347a3",
   "src/project_evidence/__init__.py": "7d9e3f66185a97ef0ef98f54c9d0ad735e13451c1306463afba4e644df9817a6",
-  "src/project_evidence/agent_protocol.py": "b2a864f1e8f947d1c5e369ce39c1234702191a90130935a9d2c0f8b996baa117",
+  "src/project_evidence/agent_protocol.py": "0f9e0a427d19c1e25cc1c4893757aa1dba3da94bbb3a94e76d8a876e7b88131c",
   "src/project_evidence/source_ranges.py": "8f8803b35a6d68220c72d3d1a933a4198d99c1f5d373097a20246d060b9c509b",
-  "src/project_evidence/section_native_contract.py": "4e25044366fe01f63dfe922c40f48f78aeff6752bcc3f62ed7520c2b81c2f811",
-  "src/project_evidence/section_native_binding.py": "8564c47d8f4ad655ae1226f34c4fc03b24db42d5ab5b37c49316dfda24eaec4f",
+  "src/project_evidence/section_native_contract.py": "d7dfb005d7c6dbd1545b9b4106c648d38769333fb5b8fa4a95f27645bef8263d",
+  "src/project_evidence/section_native_binding.py": "74bc9d8ca99d0bbfba3968b53c16341f55edc5c75fc655f5f07a8d085e8173a6",
   "src/project_evidence/trial_readiness.py": "6259119fdf1a95077c98cf4a612c30798f81bc86fbc2da473ccfe44d7d3c27e0",
   "prompts/submission-native-section.txt": "d30a7b5a3db99da1548da76eed181e985ad0bdbd4f18e6ce2eb60d2430ca9092",
   "src/project_evidence/task_storage.py": "556f632e56570a09169ec3bebb9303d9b35abaa759493210d4cdcea255669378",
@@ -32,6 +32,6 @@
   "src/project_evidence/generation_contract.py": "dc274bb7308c8ce6992181b9328ab468cc6e34e6f691ac4d44f9fcb4b60ec2d6",
   "src/project_evidence/generation_loop.py": "9618a66ae2e5ceb9784169c578ad83ab3c083b598e23468a6901b32044717eb5",
   "src/project_evidence/generation_view.py": "43d047392757376dab21209bbc5bf68772b7457b73e4fbaac819f78bc8aedb27",
-  "src/project_evidence/generation_diagnostics.py": "6661e3cb97d7ee6d5d671c5cea1b3ca7ecda7465dc335e823c1d9b2c20b9085b",
-  "src/project_evidence/task_diagnostics.py": "9d6c9fde10f0d6d0ec6609031d95d0bef6db29f4d8cbb0b025d91bad6d292345"
+  "src/project_evidence/generation_diagnostics.py": "845c8ecc2cfe1461be223e23bfd8058c0dfa6cc73a40d0ca0b9f856d043a697e",
+  "src/project_evidence/task_diagnostics.py": "952afd6e7431ab65029c6d8e209cf41ed3d4455abfa320bb1c4ec32c3492f1b5"
 }

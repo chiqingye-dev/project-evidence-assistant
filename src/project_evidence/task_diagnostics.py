@@ -71,7 +71,7 @@ def safe_metadata(value):
 def engine_metadata(event):
     """Copy elapsed snapshots already taken by the engine, without a new clock."""
     value = {}
-    if event.get('type') in {'model_returned','coverage_plan_observed','coverage_claims_observed','generation_rejected'}:
+    if event.get('type') in {'model_returned','model_error','coverage_plan_observed','coverage_claims_observed','generation_rejected'}:
         details=event.get('details',{})
         if type(details) is dict:value.update(generation_metadata(details))
     counters = event.get("counters", {})
