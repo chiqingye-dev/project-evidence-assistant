@@ -1,0 +1,88 @@
+{
+  "version": "0.5",
+  "split": "fixed development benchmark; known project, not unseen holdout",
+  "source_url": "https://github.com/chiye0384-dot/ForgeOJ",
+  "commit": "058f36c771f15735a1e987a21c55074b80f511a9",
+  "repetitions": 3,
+  "baseline": "Same model and schema, keyword retrieval top 2 source chunks, no model-selected tools",
+  "reviewer": "Automatic concept checks plus explicitly reported developer source-assisted review; not independent blind review",
+  "cases": [
+    {
+      "id": "Q-response", "topic": "query", "title": "题目详情的响应组装",
+      "question": "解释load(slug)如何查找题目、如何处理找不到的情况，以及publicSamples和资源限制如何组装。仅据实际读取说明，不推断缓存命中或运行效果。",
+      "keywords": ["load", "findActiveBySlug", "PublicSampleResponse", "ResourceLimitsResponse"],
+      "sources": [{"path": "forgeoj-api/src/main/java/com/forgeoj/api/problem/ProblemController.java", "start_line": 35, "end_line": 56}],
+      "concepts": [["findActiveBySlug"], ["NOT_FOUND", "404"], ["PublicSampleResponse", "样例"], ["ResourceLimitsResponse", "资源限制"]]
+    },
+    {
+      "id": "Q-sql", "topic": "query", "title": "题目查询SQL的筛选条件",
+      "question": "解释findActiveBySlug的参数绑定、ACTIVE/PUBLIC筛选、LIMIT及当前判题版本的JOIN。说明静态SQL不等于数据库执行或鉴权已验证。",
+      "keywords": ["findActiveBySlug", "ACTIVE", "PUBLIC", "LIMIT"],
+      "sources": [{"path": "forgeoj-api/src/main/java/com/forgeoj/api/problem/ProblemMapper.java", "start_line": 9, "end_line": 41}],
+      "concepts": [["#{slug}", "参数绑定", "占位"], ["ACTIVE"], ["PUBLIC"], ["LIMIT 1", "limit 1"], ["current_judge_version_id"]]
+    },
+    {
+      "id": "S-validation", "topic": "submission", "title": "提交语言与源码校验",
+      "question": "解释支持的语言、空白/NUL/UTF-8字节大小检查，以及package和Main正则检查的先后。没有读取codeOnly实现时明确保留其内部行为未知。",
+      "keywords": ["validateLanguage", "validateSource", "MAX_SOURCE_BYTES"],
+      "sources": [
+        {"path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java", "start_line": 15, "end_line": 23},
+        {"path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java", "start_line": 85, "end_line": 108},
+        {"path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java", "start_line": 209, "end_line": 211}
+      ],
+      "concepts": [["JAVA_21"], ["65536", "64", "MAX_SOURCE_BYTES"], ["UTF_8", "UTF-8", "UTF8"], ["NUL", "null character", "\\0", "空字符"], ["codeOnly"], ["未读", "未知", "未读取", "没有读取"]]
+    },
+    {
+      "id": "S-idempotency", "topic": "submission", "title": "幂等键UUID校验",
+      "question": "解释parseIdempotencyKey对null、UUID格式、canonical表示和大小写的处理，并说明badRequest返回的状态异常。不要展开事务写入。",
+      "keywords": ["parseIdempotencyKey", "equalsIgnoreCase", "badRequest"],
+      "sources": [
+        {"path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java", "start_line": 69, "end_line": 83},
+        {"path": "forgeoj-api/src/main/java/com/forgeoj/api/submission/SubmissionService.java", "start_line": 209, "end_line": 211}
+      ],
+      "concepts": [["null", "缺失"], ["UUID.fromString"], ["canonical", "规范"], ["equalsIgnoreCase", "忽略大小写", "大小写不敏感"], ["BAD_REQUEST", "400"]]
+    },
+    {
+      "id": "C-parser", "topic": "consumption", "title": "消费消息的严格契约检查",
+      "question": "解释消息解析为何拒绝未知字段，taskId/submissionId的canonical UUID校验是否忽略大小写，以及taskType和contractVersion的约束。",
+      "keywords": ["FAIL_ON_UNKNOWN_PROPERTIES", "validate", "isCanonicalUuid"],
+      "sources": [{"path": "forgeoj-judge-worker/src/main/java/com/forgeoj/worker/messaging/JudgeTaskMessageParser.java", "start_line": 1, "end_line": 54}],
+      "concepts": [["FAIL_ON_UNKNOWN_PROPERTIES", "未知字段"], ["taskId"], ["submissionId"], ["JUDGE_SUBMISSION"], ["contractVersion"], ["大小写敏感", "区分大小写", "equals(", "严格"]]
+    },
+    {
+      "id": "C-confirm", "topic": "consumption", "title": "Outbox发送确认的成功与失败",
+      "question": "解释publishConfirmed如何等待broker confirm，NACK、returned和中断时如何处理。区分发送确认成功与消费者处理/数据库落库成功。",
+      "keywords": ["publishConfirmed", "BROKER_NACK", "UNROUTABLE", "INTERRUPTED"],
+      "sources": [{"path": "forgeoj-api/src/main/java/com/forgeoj/api/messaging/OutboxPublisher.java", "start_line": 86, "end_line": 122}],
+      "concepts": [["confirm", "确认"], ["BROKER_NACK", "NACK"], ["UNROUTABLE", "returned", "退回"], ["interrupt", "中断"], ["不代表", "不等于", "不能", "无法"]]
+    },
+    {
+      "id": "J-comparator", "topic": "judging", "title": "输出比较的规范化边界",
+      "question": "解释M0OutputComparator如何处理换行、每行末尾空格和tab、末尾空行；是否会忽略行首空格或任意位置空格？",
+      "keywords": ["normalize", "stripTrailingHorizontalWhitespace", "matches"],
+      "sources": [{"path": "forgeoj-judge-worker/src/main/java/com/forgeoj/worker/sandbox/M0OutputComparator.java", "start_line": 1, "end_line": 36}],
+      "concepts": [["换行", "CRLF"], ["末尾", "行尾"], ["tab", "制表", "\\t"], ["空行"], ["行首", "开头", "前导"]]
+    },
+    {
+      "id": "J-runner", "topic": "judging", "title": "判题执行委托与异常分流",
+      "question": "按顺序说明heartbeat、snapshot加载、sandbox execute(attemptId)和finish；区分两类平台异常处理。没有读取辅助实现时不要声称容器隔离或真实判题已成功。",
+      "keywords": ["heartbeatCoordinator", "snapshotLoader", "execute", "recordPlatformFailure"],
+      "sources": [{"path": "forgeoj-judge-worker/src/main/java/com/forgeoj/worker/messaging/M0JudgeTaskRunner.java", "start_line": 34, "end_line": 66}],
+      "concepts": [["heartbeat", "心跳"], ["snapshot", "快照"], ["attemptId"], ["finish"], ["recordUnrecoverablePlatformFailure"], ["recordPlatformFailure"]]
+    },
+    {
+      "id": "G-cache", "topic": "query", "title": "缺证据：缓存策略",
+      "question": "仅凭给定getProblem入口片段，能确定缓存TTL、失效策略和线程安全保证吗？如果不能，请明确缺少什么证据，不猜实现。",
+      "keywords": ["cache.read", "getProblem"], "expected_gap": true,
+      "sources": [{"path": "forgeoj-api/src/main/java/com/forgeoj/api/problem/ProblemController.java", "start_line": 28, "end_line": 34}],
+      "concepts": [["TTL", "过期"], ["未", "未知", "无法", "不能", "缺少"]]
+    },
+    {
+      "id": "G-isolation", "topic": "judging", "title": "缺证据：生产隔离保证",
+      "question": "仅凭给定SandboxOutcome类型，能证明生产容器已经启动、隔离有效且没有资源泄漏吗？请依据证据回答，缺实现或运行证据就明确说未知。",
+      "keywords": ["SandboxOutcome"], "expected_gap": true,
+      "sources": [{"path": "forgeoj-judge-worker/src/main/java/com/forgeoj/worker/sandbox/SandboxOutcome.java", "start_line": 1, "end_line": 12}],
+      "concepts": [["不能", "无法", "未知", "缺少", "不足"], ["运行", "容器", "隔离"]]
+    }
+  ]
+}

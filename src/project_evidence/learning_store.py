@@ -13,6 +13,13 @@ from .source_policy import normalize_github_repository, require_allowed_path
 from . import __version__
 
 MAX_LEARNING_RECORDS = 100
+COMPATIBLE_PARENT_VERSIONS = frozenset({"0.4.0", "0.4.1", "0.4.2", "0.4.3", "0.4.4", "0.4.5"})
+
+
+def compatible_parent(payload):
+    """Reuse schema-1 data without rewriting its version or quality provenance."""
+    return (payload.get("content_schema_version") == 1
+            and payload.get("producer_version") in COMPATIBLE_PARENT_VERSIONS | {__version__})
 
 
 class LearningStore:
@@ -114,7 +121,7 @@ class LearningStore:
                     raise ValueError("learning_outline_missing")
                 parent = json.loads(row[0])
                 if (parent["commit"] != record.commit or parent["execution_mode"] != task["execution_mode"]
-                        or parent.get("producer_version") != __version__ or parent.get("content_schema_version") != 1):
+                        or not compatible_parent(parent)):
                     raise ValueError("learning_outline_identity_mismatch")
                 outline = ChapterOutline.model_validate(parent["content"])
                 if selection.section_id not in {section.id for section in outline.sections}:
@@ -138,7 +145,7 @@ class LearningStore:
                 parent = json.loads(row[0])
                 for saved in (body, parent):
                     if (saved["commit"] != record.commit or saved["execution_mode"] != task["execution_mode"]
-                            or saved.get("producer_version") != __version__ or saved.get("content_schema_version") != 1
+                            or not compatible_parent(saved)
                             or normalize_github_repository(saved["public_url"]) != normalize_github_repository(record.public_url)):
                         raise ValueError("followup_parent_identity_mismatch")
                 previous = SectionExplanation.model_validate(body["content"])

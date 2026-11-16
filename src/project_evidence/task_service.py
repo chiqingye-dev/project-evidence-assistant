@@ -12,7 +12,7 @@ from .agent_protocol import (AgentBudget, ModelContext, UnconfiguredAdapter, Dir
                              GOAL, OUTLINE_GOAL, SECTION_GOAL, FOLLOW_UP_GOAL)
 from .learning_contract import (OutlineSelection, SectionSelection, FollowUpSelection,
                                 LearningAnchor, ChapterOutline, SectionExplanation)
-from .learning_store import LearningStore
+from .learning_store import LearningStore, compatible_parent
 from .source_policy import require_allowed_path
 from .source import SourceError
 from .source_service import SourceService
@@ -67,6 +67,8 @@ class TaskService:
         self.adapter = adapter if adapter is not None else UnconfiguredAdapter()
         self.limits = AgentBudget(max_retries=0) if (section_review_policy is not None and
             section_review_policy.public_objectives) else AgentBudget()
+        if section_review_policy is None and getattr(adapter, "max_validation_corrections", 0) == 2:
+            self.limits = AgentBudget(max_retries=2)
         self._lock = RLock()
         self._thread: Thread | None = None
         self._cancel = Event()
@@ -141,7 +143,8 @@ class TaskService:
             if kind == FOLLOW_UP_GOAL:
                 followup = FollowUpSelection.model_validate(inputs)
                 body = self.learning.get(record, followup.body_id)
-                if (body is None or body["kind"] != SECTION_GOAL or body["review_status"] != "current"
+                if (body is None or body["kind"] != SECTION_GOAL or body["commit"] != record.commit
+                        or not compatible_parent(body)
                         or body["execution_mode"] != self.adapter.execution_mode):
                     raise ValueError("invalid_followup_body")
                 explanation = SectionExplanation.model_validate(body["content"])
@@ -153,7 +156,8 @@ class TaskService:
             else:
                 selection = SectionSelection.model_validate(inputs)
             parent = self.learning.get(record, selection.outline_id)
-            if (parent is None or parent["kind"] != OUTLINE_GOAL or parent["review_status"] != "current"
+            if (parent is None or parent["kind"] != OUTLINE_GOAL or parent["commit"] != record.commit
+                    or not compatible_parent(parent)
                     or parent["execution_mode"] != self.adapter.execution_mode):
                 raise ValueError("invalid_learning_parent")
             outline = ChapterOutline.model_validate(parent["content"])

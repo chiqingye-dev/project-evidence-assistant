@@ -1,22 +1,21 @@
 # 项目学习证据助手
 
-面向公开 Java 后端项目的本地源码学习 Agent。通过受控查找、搜索与片段读取生成项目目录、章节正文和追问，将解释关联到固定 Git 提交及具体源码行。
+面向公开 Java 后端项目的本地源码学习 Agent。模型通过三个只读工具查阅固定 Git 提交，生成带源码引用的章节说明；宿主程序控制文件权限、执行次数、取消与费用。
 
-项目提供 FastAPI 后台、原生网页、SQLite 存储和自定义 Agent 循环，技术栈为 Python 3.12、FastAPI、Pydantic、HTTPX、SQLite、JavaScript。
+技术栈：Python 3.12、FastAPI、Pydantic、HTTPX、SQLite、原生 JavaScript。
 
-本地0.4.4候选包含[图文学习流程](docs/learning-guide.md)：原阅读区支持表格、本地图表及折叠参考答案。0.4.3补充单一JSON对象约束及安全诊断，0.4.4加入应用配置的逐文件行范围合同和配套只读工具。严格拒绝无效响应和越界读取，不截取修复或自动重试。真实模型讲解与图表质量仍需按任务验收，旧记录保留实际版本并需复核。
+## 0.5 的变化
 
-## 当前进度
+- 普通正文只要求文本块及其 `evidence_ids`。程序填写章节身份并推导块的位置，不要求模型填写覆盖编号、字段路径和引文定位。
+- 本地保留脱敏后的模型原始响应。正文校验失败时反馈具体错误，最多纠正两次；每次仍计入同一任务和累计费用。
+- 固定开发评测覆盖四条业务链路和证据不足问题，每题三次，与同模型的关键词检索基线比较。见[评测报告](docs/evaluation-v05.md)。
+- 停止 S03 单题满分攻关，保留其[已知限制与失败分析](docs/known-limitations.md)。
 
-这是可运行的开发版本。已实现公开版本核验、文件工具、任务历史、四类主题的章节与正文入口、追问、证据保存、阅读位置和模型费用控制。默认启动可以登记项目、核验公开来源、查阅源码与保存证据。
-
-真实模型开发试验覆盖查询、提交、消息消费、判题。2026-11-08 的 F03 隔离候选完成引用规划和正文，原定 7 条标准通过助手源码辅助评审；这是用于调试的开发题，不能代表未见评测或稳定性。此前失败记录保留在开发工作区。完整固定题集、检索基线对比和 V1 验收仍在进行。
-
-本地 0.4.1 接入了显式平铺正文格式、当前完整读取证据 ID 枚举和无引用块约束。发布副本的接入通过独立工程测试验证；上面的真实模型结果对应隔离候选。自动化和模拟模型测试用于验证工程行为，真实模型质量按逐题结果记录。
+这是开发版本。格式和引用 ID 通过校验不代表解释语义正确，也不代表使用者已经掌握项目。0.4 系列实验协议保留兼容入口，不再作为默认正文路径。
 
 ## 本机启动
 
-需要 Python 3.12 和 Git。当前依赖锁定基于 Windows。
+需要 Python 3.12 和 Git。
 
 ```powershell
 git clone https://github.com/chiye0384-dot/project-evidence-assistant.git
@@ -26,53 +25,48 @@ py -3.12 -m venv .venv
 & .\.venv\Scripts\python.exe -B run.py
 ```
 
-浏览器打开 <http://127.0.0.1:8765>。端口占用时可运行 `run.py --port 8766`。
+打开 <http://127.0.0.1:8765>。默认无需 Key，可以登记公开项目、核对固定提交、查阅源码和旧记录。端口占用可加 `--port 8766`。
 
-默认启动无需模型 Key。登记一个本机普通 Git 仓库，填入其公开 GitHub URL 和完整 40 位提交，手动核对公开版本后即可使用只读工具。核对需要匿名访问 GitHub，API 限流时会核对官方公开网页。演示材料可选 [ForgeOJ](https://github.com/chiye0384-dot/ForgeOJ) 的公开固定版本。ForgeOJ 是学习材料，本仓库实现学习助手自身。
-
-收费模型入口保留为实验功能，见 [模型配置](docs/model-configuration.md)。使用者的密钥、实时价格凭据、费用授权和数据库保存在各自本机。
+模型从本机 `DEEPSEEK_API_KEY` 环境变量读取。配置及费用说明见[模型配置](docs/model-configuration.md)。升级已有工作区必须保留原 `data/` 账本，不能新建授权绕过累计预算。开发者的数据库、Key、原始响应和实验档案不会随源码发布。
 
 ## 执行流程
 
 ```mermaid
 flowchart LR
-    A[登记固定公开提交] --> B[核对公开身份和许可证]
-    B --> C[Git 对象只读工具]
-    C --> D[有界 Agent 循环]
-    D --> E[引用和输出校验]
-    E --> F[目录、章节、追问与阅读记录]
-    D --> G[费用预留与可信用量结算]
+    A[固定公开提交] --> B[核对来源与许可证]
+    B --> C[Agent循环]
+    C --> D[模型选择只读工具]
+    D --> E[宿主校验并执行]
+    E --> C
+    C --> F[正文与引用校验]
+    F -->|可纠正错误 最多两次| C
+    F --> G[保存候选正文]
+    C --> H[费用预留与用量结算]
 ```
 
-- 源码身份通过提交、树、blob 和内容摘要核对，行号与版本随证据保存。
-- 工具执行检查路径、链接、类型、大小、数量和截断，源码只取固定 Git 对象。
-- Agent 约束调用次数、工具次数、时间、上下文、输出和费用。两阶段追问先冻结引用，再生成对应正文。
-- 可信供应商 usage 用于结算。请求结果不确定时保留费用预留，后续调用受门禁控制。
-- 任务取消、来源变化、版本切换和重开均有持久化状态，旧证据与正文可回查。
+源码来自固定 Git 对象；模型不能执行 Shell、Java、SQL 或 Docker。路径、敏感内容、行范围、数量、时间和费用由应用控制。权限失败、来源变化和费用不确定会停止任务，不按输出错误自动重试。
 
-## 验证
+## 阅读与验证
 
-安装锁定依赖后运行独立测试集。
+先读[四部分代码导读](docs/code-guide.md)，再沿文件和行号查看实现。导读包含失败案例、小修改练习和三分钟演示顺序。[图文阅读说明](docs/learning-guide.md)介绍网页中的表格、图表和折叠参考答案。
 
 ```powershell
 & .\.venv\Scripts\python.exe -B -m pytest -q
 node tests/frontend-list-race.cjs
 node tests/frontend-agent-tasks.cjs
 node tests/frontend-learning.cjs
+node tests/frontend-learning-content.cjs
 ```
 
-测试使用临时 Git 仓库、合成源码和模拟 HTTP，覆盖源码边界、Agent 终止、章节保存、费用结算、接口隔离与前端异步状态。查看 [验证记录](docs/verification.md) 获取本次独立副本的结果与范围。
+测试结果与范围见[工程验证记录](docs/verification.md)。工程测试主要使用临时 Git、SQLite 和模拟 HTTP；真实模型指标单列在评测报告，二者不相加。
 
-## 代码入口
+评测准备检查：
 
-| 入口 | 职责 |
-| --- | --- |
-| `src/project_evidence/app.py` | 本机 HTTP API 和网页 |
-| `source.py`、`source_service.py`、`tools.py` | 公开来源、固定 Git 对象和受控工具 |
-| `agent_engine.py`、`agent_protocol.py` | Agent 循环、预算和行动合同 |
-| `task_service.py`、`task_storage.py` | 任务生命周期与持久化 |
-| `deepseek_adapter.py`、`spending.py` | 模型请求、预留和用量结算 |
-| `followup_two_phase.py`、`learning_contract.py` | 冻结引用与正文校验 |
-| `static/` | 原生 JavaScript 网页 |
+```powershell
+& .\.venv\Scripts\python.exe -B scripts/evaluate.py --prepare-only `
+  --data-dir .\data --source D:\path\to\public-project
+```
 
-版本化实验目录与本机历史账本保留在开发工作区，本仓库提供独立的源码和核心测试快照。第三方依赖说明见 [THIRD-PARTY.md](THIRD-PARTY.md)。
+去掉 `--prepare-only` 才会读取环境变量并调用模型。题集固定在 `evaluation/fixed_v05.json`；它是已知项目的开发评测，不能声称未见题泛化能力。
+
+第三方依赖说明见 [THIRD-PARTY.md](THIRD-PARTY.md)。

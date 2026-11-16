@@ -270,7 +270,7 @@ class _Runner:
             raise _Stop("budget_exhausted")
         if error.retryable and self.counters.retries < self.limits.max_retries:
             self.counters.retries += 1
-            self._event("retry", "临时错误有限重试；调用额度不重置。", operation=operation, code=error.code)
+            self._event("retry", "可恢复错误有限重试或纠正；调用额度不重置。", operation=operation, code=error.code)
             return True
         raise _Stop("timeout" if error.code == "timeout" else "failed")
 
@@ -706,6 +706,14 @@ class _Runner:
             identity = getattr(self.adapter, "guidance_sha256", None)
             prompt_identity = {"guidance_sha256": identity} if isinstance(identity, str) and _SHA256.fullmatch(identity) else {}
             self._event("started", "启动有界目录任务；没有读取整个工作区。" if self.goal == GOAL else "启动选定后端章节的有界任务；只按需查阅公开片段。", adapter_kind=self.kind, mode=self.mode, **prompt_identity)
+            # A retrieval baseline supplies host-selected reads through exactly
+            # the same tool, provenance and budget checks as model-selected reads.
+            for selected_read in getattr(self.adapter, "initial_reads", ()):
+                call = ToolCall.model_validate(selected_read)
+                if call.name != "read_excerpt":
+                    raise _Stop("denied")
+                if self._tool_result(call, initial).get("status") != "ok":
+                    raise _Stop("failed")
             if self.section_generation is not None and self.section_generation.layout=='preloaded_groups_v1':
                 if self.goal!=SECTION_GOAL:raise _Stop('failed')
                 for call in self.section_generation.preload_calls():

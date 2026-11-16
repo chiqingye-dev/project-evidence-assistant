@@ -14,6 +14,8 @@ sys.path.insert(0, str(ROOT / "src"))
 def main() -> None:
     parser = argparse.ArgumentParser(description="项目学习证据助手：本地服务")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--legacy-model-protocol", action="store_true",
+                        help="保留旧实验协议；默认0.5正文仅要求文本块与证据ID")
     parser.add_argument('--deepseek-proxy-port', type=int, default=0,
                         help='显式使用127.0.0.1上的HTTP/混合代理端口；0为原直连，不改系统网络')
     parser.add_argument("--enable-paid-model", action="store_true",
@@ -79,7 +81,8 @@ def main() -> None:
         from project_evidence.spending import SpendingLedger, SpendingError, PROFILE
         from project_evidence.storage import ProjectStore
         from project_evidence.deepseek_adapter import DeepSeekAdapter
-        key = os.environ.get("DEEPSEEK_API_KEY", "")
+        from project_evidence.development_config import read_api_key
+        key = read_api_key()
         if not key:
             parser.error("请仅在本机设置DEEPSEEK_API_KEY；不要在命令行参数或聊天中粘贴密钥。")
         ledger = SpendingLedger(ProjectStore(ROOT / "data"))
@@ -123,7 +126,24 @@ def main() -> None:
             scope_options = ({'followup_scope_view': 'java_scope_edge_unit_index_columns_v1'} if args.followup_index_columns else
                              {'followup_scope_view': 'java_scope_edge_unit_columns_v1'} if args.followup_scope_columns else
                              {'followup_scope_view': 'java_scope_edge_view_v1'} if args.followup_scope_view else {})
-            adapter = DeepSeekAdapter(key, ledger, grant, enable_query=args.enable_query_model, enable_submission=args.enable_submission_model,
+            adapter_class = DeepSeekAdapter
+            if not args.legacy_model_protocol and not any((
+                args.followup_strict_function, args.followup_two_phase, args.followup_claim_parts,
+                args.followup_selected_table, args.followup_prose_kind, args.followup_prose_flat,
+                args.followup_scope_view, args.followup_scope_columns, args.followup_index_columns,
+            )):
+                from project_evidence.simple_section import SimpleSectionAdapter
+                adapter_class = SimpleSectionAdapter
+            if adapter_class is not DeepSeekAdapter:
+                adapter = adapter_class(
+                    key, ledger, grant, enable_query=args.enable_query_model,
+                    enable_submission=args.enable_submission_model,
+                    enable_consumption=args.enable_consumption_model,
+                    enable_judging=args.enable_judging_model,
+                    enable_followup=args.enable_followup_model, **network_options,
+                )
+            else:
+                adapter = DeepSeekAdapter(key, ledger, grant, enable_query=args.enable_query_model, enable_submission=args.enable_submission_model,
                                       enable_consumption=args.enable_consumption_model, enable_judging=args.enable_judging_model,
                                       enable_followup=args.enable_followup_model,
                                       followup_protocol=('two_phase' if args.followup_two_phase else

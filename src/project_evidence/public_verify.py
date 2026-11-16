@@ -58,8 +58,9 @@ def repository_name(url: str) -> str:
 
 
 class PublicGitHubVerifier:
-    def __init__(self, transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(self, transport: httpx.BaseTransport | None = None, *, prefer_html=False) -> None:
         self.transport = transport
+        self.prefer_html = prefer_html
 
     @staticmethod
     def _json(client: httpx.Client, endpoint: str, deadline: float) -> dict:
@@ -99,6 +100,9 @@ class PublicGitHubVerifier:
                      "X-GitHub-Api-Version": "2026-03-10",
                      "User-Agent": "project-evidence-assistant/0.1"},
         ) as client:
+            if self.prefer_html:
+                client.headers["Accept"] = "text/html"
+                return self._verify_web(client, repository, commit, deadline)
             try:
                 repo = self._json(client, f"/repos/{repository}", deadline)
             except _PublicApiRateLimit:
