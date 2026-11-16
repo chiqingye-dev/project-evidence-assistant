@@ -136,3 +136,23 @@ def test_owned_network_transport_is_closed_after_each_request(tmp_path):
         assert client.get("https://example.com").json() == {"ok": True}
         assert client.get("https://example.com").json() == {"ok": True}
     assert len(closed) == 2
+
+
+def test_baseline_request_does_not_inherit_legacy_read_instructions(tmp_path):
+    captured = []
+
+    def respond(request):
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json=envelope("report_gap", {"message": "缺证据", "gaps": ["未知"]}))
+
+    adapter, _ = configured(tmp_path, respond)
+    adapter.allow_source_tools = False
+    adapter._ranges = {"src/Example.java": ((35, 56),)}
+    run_agent(adapter, lambda *args: None, lambda: None, lambda: False, initial_context=context())
+    body = captured[0]
+    assert "不提供源码工具" in body["messages"][0]["content"]
+    assert "先按需使用" not in body["messages"][0]["content"]
+    payload = json.loads(body["messages"][1]["content"])
+    assert "system_instruction" not in payload["context"]
+    assert payload["allowed_source_ranges"] == {"src/Example.java": [[35, 56]]}
+    assert {tool["function"]["name"] for tool in body["tools"]} == {"report_gap"}

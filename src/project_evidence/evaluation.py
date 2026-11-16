@@ -181,7 +181,7 @@ def write_report(path, summary, suite, *, complete):
                      f"{row['fee_microyuan'] / 1_000_000:.6f}|{seconds}|")
     lines.extend(["", "每题只有3次，不能据此声称稳定通用成功率。S03单题攻关已停止，其历史失败保留为限制案例。",
                   "原始响应、每次结果、纠正和可信usage在本机忽略提交的data目录中；报告不会发布API Key。", ""])
-    Path(path).write_text("\n".join(lines), encoding="utf-8")
+    Path(path).write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def main():
