@@ -65,7 +65,7 @@ sequenceDiagram
 
 先读[已知限制](known-limitations.md)。S03 曾把普通 `afterCommit(...)` 调用说成“传入回调”。文件引用正确、JSON 合法，都无法证明这个解释。要看调用参数和声明，不能凭方法名联想机制。
 
-旧流程多次结构失败未保留原始参数，后来只能知道粗略标签。0.5 在 [response_archive.py:31](../src/project_evidence/response_archive.py#L31) 先保存脱敏响应，再在 [simple_section.py:246](../src/project_evidence/simple_section.py#L246) 请求入口解析校验；具体错误最多反馈两次。
+旧流程多次结构失败未保留原始参数，后来只能知道粗略标签。0.5 在 [response_archive.py:31](../src/project_evidence/response_archive.py#L31) 先保存脱敏响应，再在 [simple_section.py:247](../src/project_evidence/simple_section.py#L247) 请求入口解析校验；具体错误最多反馈两次。
 
 定位顺序：查 `data/model-responses/任务ID/` → 看真实函数和参数 → 对照本地错误 → 核对 `model_spend` 的 usage 与状态 → 区分格式、来源、费用、语义问题。不要默认归咎 Key，也不要靠下一次成功覆盖本次失败。
 
